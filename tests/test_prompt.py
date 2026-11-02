@@ -53,6 +53,17 @@ def test_system_prompt_has_untrusted_boundary() -> None:
     assert "转账" in prompt  # 金钱话题禁止
 
 
+def test_system_prompt_embeds_memory_block() -> None:
+    prompt = build_system_prompt("画像", [], memory_block="【我记得的事】\n- 张伟 计划搬家：月底")
+    assert "我记得的事" in prompt
+    assert "月底" in prompt
+
+
+def test_build_messages_passes_memory_block() -> None:
+    turns = build_messages([other("在吗")], "今晚有空吗", memory_block="【我记得的事】\n- 约了周三")
+    assert "约了周三" in turns[0].content
+
+
 # ---------------------------------------------------------------- 出口清洗
 
 

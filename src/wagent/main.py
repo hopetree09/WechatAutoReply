@@ -21,6 +21,7 @@ import argparse
 import sys
 import time
 from collections.abc import Sequence
+from datetime import datetime
 
 from wagent import config as config_module
 from wagent.actuator import SafeSender, SendMode, TypingProfile
@@ -30,6 +31,7 @@ from wagent.im.base import Frame, IMAdapter
 from wagent.im.mock import MockAdapter
 from wagent.llm.client import ChatResult, LLMClient
 from wagent.llm.prompt import load_fewshot, load_profile
+from wagent.memory import MemoryQuery, MemoryRetriever, MemoryStore
 from wagent.perception.types import Box, Message, Speaker
 
 FAKE_REPLY = "在的 八点老地方见"
@@ -86,6 +88,23 @@ def _review_confirm(text: str) -> bool:
     return answer in {"y", "yes"}
 
 
+def _seed_demo_memory(store: MemoryStore) -> None:
+    """离线演示用的记忆数据（不碰用户真实数据库）。"""
+    from wagent.memory import FactCard, PersonProfile, StyleSample
+    from wagent.memory.types import SELF_PERSON
+
+    store.upsert_profile(
+        PersonProfile(person="路旁的树", display_name="路旁的树", relation="朋友",
+                      traits=("爱聊技术",), preferences=("咖啡",))
+    )
+    store.upsert_profile(PersonProfile(person=SELF_PERSON, display_name="我", traits=("话少", "偶尔冷幽默")))
+    store.add_fact(
+        FactCard(person="路旁的树", subject="路旁的树", predicate="约了见面",
+                 value="周三晚上八点老地方", confidence=0.9, evidence_text="今晚有空吗")
+    )
+    store.add_style_samples([StyleSample(text="行吧 先这样"), StyleSample(text="问题不大")])
+
+
 def build_runtime(args: argparse.Namespace, mode: SendMode) -> AgentRuntime:
     settings = config_module.get_settings()
 
@@ -98,10 +117,26 @@ def build_runtime(args: argparse.Namespace, mode: SendMode) -> AgentRuntime:
         adapter = WeChatAdapter(settings)
 
     llm: ChatModel = FakeLLM() if args.fake_llm else LLMClient(settings.llm)
+
+    # 层级记忆：从本地 SQLite 检索「画像 + 事实 + 最近事件 + 风格样本」
+    memory_store = MemoryStore(":memory:") if args.mock else MemoryStore(settings.paths.db_path)
+    if args.mock:
+        _seed_demo_memory(memory_store)
+    retriever = MemoryRetriever(memory_store)
+
+    def memory_for(trigger) -> str:
+        query = MemoryQuery(
+            person=trigger.session or "unknown",
+            latest_text=trigger.message.text,
+            now=datetime.now().astimezone(),
+        )
+        return retriever.build(query).to_prompt_block()
+
     generator = LLMGenerator(
         llm,
         profile=load_profile(settings.paths.profile_path),
         fewshot=load_fewshot(settings.paths.fewshot_dir),
+        memory_provider=memory_for,
     )
 
     typing = TypingProfile(**settings.typing.model_dump(exclude={"send_key"}))

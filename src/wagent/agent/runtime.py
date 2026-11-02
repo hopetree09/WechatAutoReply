@@ -64,7 +64,7 @@ class TickResult:
 
 
 class LLMGenerator:
-    """把 Trigger 变成回复文本。"""
+    """把 Trigger 变成回复文本（可注入层级记忆检索）。"""
 
     def __init__(
         self,
@@ -73,11 +73,21 @@ class LLMGenerator:
         profile: str = "",
         fewshot: Sequence[str] = (),
         limit: int = 12,
+        memory_provider: Callable[[Trigger], str] | None = None,
     ) -> None:
         self.llm = llm
         self.profile = profile
         self.fewshot = list(fewshot)
         self.limit = limit
+        self.memory_provider = memory_provider
+
+    def _memory_block(self, trigger: Trigger) -> str:
+        if self.memory_provider is None:
+            return ""
+        try:
+            return self.memory_provider(trigger) or ""
+        except Exception:
+            return ""
 
     def __call__(self, trigger: Trigger) -> str:
         turns = build_messages(
@@ -86,6 +96,7 @@ class LLMGenerator:
             profile=self.profile,
             fewshot=self.fewshot,
             limit=self.limit,
+            memory_block=self._memory_block(trigger),
         )
         result = self.llm.chat(turns)
         return clean_reply(result.text)

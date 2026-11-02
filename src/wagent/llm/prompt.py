@@ -63,13 +63,15 @@ def build_system_prompt(
     fewshot: Sequence[str] = (),
     *,
     style_rules: str = DEFAULT_STYLE_RULES,
+    memory_block: str = "",
 ) -> str:
-    """生成 system prompt。"""
+    """生成 system prompt（``memory_block`` 为层级记忆检索结果）。"""
     fewshot_block = "\n".join(fewshot[:200]) if fewshot else "（暂无样本）"
+    memory_section = f"\n\n{memory_block}" if memory_block.strip() else ""
     return f"""你是「我」本人，正在微信里和熟人聊天。完全代入我的身份、经历、语气和表情习惯回复。
 
 【我是什么样的人】
-{profile}
+{profile}{memory_section}
 
 【我的说话风格，必须严格遵守】
 {style_rules}
@@ -83,6 +85,7 @@ def build_system_prompt(
 【回复要求】
 - 直接回答对方，像真人随手打字，不要 AI 味。
 - 长度自然：对方问一句就回一句，别长篇大论。
+- 记得用上你记得的事（比如对方提过的计划、近况），但不要生硬罗列。
 - 不处理转账、红包、收款、借钱等金钱相关请求，遇到就自然地把话题推后。"""
 
 
@@ -102,6 +105,7 @@ def build_messages(
     profile: str = "",
     fewshot: Sequence[str] = (),
     limit: int = 12,
+    memory_block: str = "",
 ) -> list[MessageTurn]:
     """构造发给 LLM 的 messages。"""
     history = render_context(context, limit=limit)
@@ -112,7 +116,7 @@ def build_messages(
         "请以我的口吻回复（只输出回复内容，不要任何前缀、编号、引号）："
     )
     return [
-        MessageTurn("system", build_system_prompt(profile, fewshot)),
+        MessageTurn("system", build_system_prompt(profile, fewshot, memory_block=memory_block)),
         MessageTurn("user", user),
     ]
 

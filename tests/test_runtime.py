@@ -228,3 +228,32 @@ def test_llm_generator_builds_prompt_and_cleans_output() -> None:
     assert llm.messages is not None
     assert "后端工程师" in llm.messages[0].content
     assert "对方: 在吗" in llm.messages[1].content
+
+
+def test_llm_generator_injects_memory_block() -> None:
+    llm = FakeLLM("在的")
+    generator = LLMGenerator(
+        llm,
+        memory_provider=lambda _trigger: "【我记得的事】\n- 张伟 计划搬家：月底",
+    )
+    runtime, _, _ = make_runtime(
+        [frame(other("在吗")), frame(other("在吗"), other("搬家定了吗"))],
+        generate=generator,
+    )
+    runtime.tick()
+    runtime.tick()
+    assert "我记得的事" in llm.messages[0].content
+
+
+def test_llm_generator_survives_memory_failure() -> None:
+    def boom(_trigger):
+        raise RuntimeError("记忆库挂了")
+
+    llm = FakeLLM("在的")
+    generator = LLMGenerator(llm, memory_provider=boom)
+    runtime, _, _ = make_runtime(
+        [frame(other("在吗")), frame(other("在吗"), other("在吗2"))],
+        generate=generator,
+    )
+    runtime.tick()
+    assert runtime.tick().action == "preview"
