@@ -232,3 +232,18 @@ def test_style_sample_sampling_is_deterministic() -> None:
     a = retriever.build(MemoryQuery(person=PERSON, latest_text="同一句话", now=now))
     b = retriever.build(MemoryQuery(person=PERSON, latest_text="同一句话", now=now))
     assert a.style_samples == b.style_samples
+
+
+def test_retrieval_includes_self_facts() -> None:
+    """回归：__self__ 的事实（"我"说过的事）也必须被检索到，否则记忆等于只记对方。"""
+    store = make_store()
+    store.add_fact(
+        FactCard(person=SELF_PERSON, subject="我", predicate="电脑配置", value="5060 显卡")
+    )
+    store.add_fact(
+        FactCard(person=PERSON, subject="张伟", predicate="计划搬家", value="10 月底搬滨江")
+    )
+    ctx = MemoryRetriever(store).build(
+        MemoryQuery(person=PERSON, latest_text="我电脑什么配置", now=datetime.now().astimezone())
+    )
+    assert "5060" in ctx.facts_block

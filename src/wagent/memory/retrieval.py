@@ -118,7 +118,10 @@ class MemoryRetriever:
         ctx.profile_block = _fit("\n".join(line for line in profile_lines if line), int(budget * 0.3))
 
         # 2) 相关事实（带时效衰减与重要性）
-        facts = self.store.active_facts(query.person, limit=200)
+        #    对方的 + 我自己的（"我"说过的事实存 __self__，不合并会永远检索不到）
+        facts = self.store.active_facts(query.person, limit=200) + self.store.active_facts(
+            SELF_PERSON, limit=200
+        )
         ranked = sorted(facts, key=lambda f: self._score(f, query), reverse=True)
         chosen = ranked[: query.max_facts]
         ctx.facts_block = _fit(
