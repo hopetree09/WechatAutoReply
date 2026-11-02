@@ -1,0 +1,37 @@
+# ── 密钥与本地配置（绝不进仓库）────────────────────────────
+.env
+.env.*
+!.env.example
+config.py
+config.local.py
+config_secret.py
+
+# ── 个人数据（聊天记录 / 口吻样本 / 自述画像 / 记忆库）─────────
+data/raw/
+data/fewshot/
+data/profile.md
+data/memory/
+
+# ── 运行时产物 ────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.log
+logs/
+screenshots/
+*.png
+*.jpg
+*.jpeg
+build/
+dist/
+*.exe
+
+# ── 虚拟环境 ──────────────────────────────────────────────
+.venv/
+venv/
+env/
+
+# ── IDE / 系统 ────────────────────────────────────────────
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
