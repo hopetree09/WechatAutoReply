@@ -31,13 +31,18 @@ PROFILE_SYSTEM = """你是说话风格分析师。根据「我」的真实微信
 
 必须覆盖这 8 类，且每条都要具体（带上真实例子/词）：
 - 身份/职业线索：
-- 口头禅：
+- 口头禅（偶尔使用，不要每句都用，注明在什么场合用）：
 - 常用表情/语气词：
 - 说话习惯（长度、标点、是否用句号/波浪号）：
 - 遇到夸我：
 - 遇到求助：
 - 话题偏好：
 - 雷区/不爱聊：
+
+隐私与质量要求（必须遵守）：
+- 不要出现任何具体人名、医院/学校/单位、地址、账号、病史、金额、联系方式等隐私信息；
+- 举例只写说话方式，不要引用敏感原文；
+- 每条一行、尽量短；不确定的宁可不写。
 
 只输出这 8 行，不要标题、不要解释、不要代码块。"""
 
@@ -84,7 +89,7 @@ def fallback_profile(records, partner: str, facts: list[str]) -> str:
     top = "、".join(text for text, _ in freq.most_common(8)) or "（无）"
     lines = [
         f"- 身份/职业线索：与「{partner}」是好友，聊天跨 {records[0].ts[:4]}~{records[-1].ts[:4]} 年。",
-        f"- 口头禅：{top}",
+        f"- 口头禅（偶尔使用，不要每句都用，注明在什么场合用）：{top}",
         "- 常用表情/语气词：几乎没有 emoji，偶尔用 [强]/[衰] 这类微信表情。",
         f"- 说话习惯：平均 {stats['avg']:.1f} 字、中位数 {stats['median']:.0f} 字，"
         f"句号率仅 {stats['period'] * 100:.1f}%，基本不写标点，短句为主。",
@@ -98,20 +103,39 @@ def fallback_profile(records, partner: str, facts: list[str]) -> str:
     return "\n".join(lines)
 
 
+PRIVACY_PATTERNS = (
+    r"医院", r"附院", r"[Cc][Tt]室", r"身份证", r"银行卡", r"密码", r"验证码",
+    r"手机号", r"余额", r"转账", r"住院", r"病史", r"地址", r"单位",
+)
+
+REQUIRED_SECTIONS = ("身份", "口头禅", "表情", "说话习惯", "遇到夸", "遇到求助", "话题", "雷区")
+
+
 def sanitize(text: str) -> str:
-    """只保留 8 条以 "- " 开头的行，去掉代码块/标题/解释。"""
+    """只保留 8 条以 "- " 开头的行，丢掉隐私/超长/非风格内容。"""
     lines = []
     for raw in text.replace("```markdown", "```").splitlines():
         line = raw.strip()
         if line.startswith("#") or line.startswith("```") or not line:
             continue
         if line.startswith(("- ", "* ", "• ")):
-            lines.append("- " + line[2:].strip())
+            body = line[2:].strip()
         elif re.match(r"^[一二三四五六七八九十\d]+[、.．]", line):
-            lines.append("- " + re.sub(r"^[一二三四五六七八九十\d]+[、.．]\s*", "", line))
+            body = re.sub(r"^[一二三四五六七八九十\d]+[、.．]\s*", "", line)
+        else:
+            continue
+        if any(re.search(pattern, body) for pattern in PRIVACY_PATTERNS):
+            continue  # 隐私内容不进画像
+        if len(body) > 120:
+            continue  # 过长的原文引用也不适合当画像
+        lines.append("- " + body)
         if len(lines) >= 8:
             break
     return "\n".join(lines)
+
+
+def has_all_sections(text: str) -> bool:
+    return all(section in text for section in REQUIRED_SECTIONS)
 
 
 def build_profile(
@@ -159,7 +183,8 @@ def build_profile(
         body = sanitize(result.text)
     except Exception as exc:
         print(f"[profile] LLM 失败，退回规则版：{exc}")
-    if len(body.splitlines()) < 5:
+    if len(body.splitlines()) < 5 or not has_all_sections(body):
+        print('[profile] LLM 输出缺少必要小节或不可用，退回规则版画像')
         body = fallback_profile(records, person, my_facts)
 
     header = (

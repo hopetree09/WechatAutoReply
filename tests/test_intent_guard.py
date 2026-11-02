@@ -1,4 +1,4 @@
-﻿"""意图路由 + 安全护栏单测（纯逻辑，不调模型）。"""
+"""意图路由 + 安全护栏单测（纯逻辑，不调模型）。"""
 
 from __future__ import annotations
 
@@ -8,6 +8,7 @@ from wagent.agent.intent import (
     Intent,
     IntentRouter,
     classify_rules,
+    needs_memory,
     parse_intent_json,
 )
 from wagent.guard import check_output, has_injection, is_laughter, mask_pii
@@ -129,3 +130,41 @@ def test_is_laughter() -> None:
     assert is_laughter("哈哈哈")
     assert is_laughter("哈哈哈哈哈哈哈！")
     assert not is_laughter("笑死我了")
+
+
+def test_needs_memory_by_intent() -> None:
+    """记忆只在提问/约时间/回忆类消息上注入，闲聊不注入。"""
+    assert needs_memory("你电脑什么配置来着") is True
+    assert needs_memory("周末有空吗 出来吃火锅") is True
+    assert needs_memory("嗯") is False
+    assert needs_memory("借我两千块周转") is False
+    assert needs_memory("哈哈哈") is False
+    assert needs_memory("之前说的那个事") is True  # 闲聊但带回忆提示词
+    assert needs_memory("烦死了 不想干了") is False
+
+
+def test_generator_skips_memory_for_chitchat() -> None:
+    from wagent.agent.runtime import LLMGenerator
+    from wagent.agent.state import Trigger
+    from wagent.perception.types import Box, Message, Speaker
+
+    captured: list[str] = []
+
+    class Capture:
+        def chat(self, messages, **kwargs):
+            captured.append(messages[0].content)
+            return SimpleNamespace(text="嗯嗯")
+
+    def trigger(text: str) -> Trigger:
+        latest = Message(speaker=Speaker.OTHER, text=text, box=Box(0, 0, 1, 1))
+        return Trigger(message=latest, context=[], session="吴浩毅")
+
+    generator = LLMGenerator(
+        Capture(),
+        memory_provider=lambda _t: "【我记得的事】\n- 我的显卡是 5060",
+        memory_policy=needs_memory,
+    )
+    generator(trigger("嗯"))
+    assert "显卡" not in captured[-1]
+    generator(trigger("你电脑什么配置"))
+    assert "显卡" in captured[-1]

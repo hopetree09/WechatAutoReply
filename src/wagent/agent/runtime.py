@@ -75,15 +75,19 @@ class LLMGenerator:
         fewshot: Sequence[str] = (),
         limit: int = 12,
         memory_provider: Callable[[Trigger], str] | None = None,
+        memory_policy: Callable[[str], bool] | None = None,
     ) -> None:
         self.llm = llm
         self.profile = profile
         self.fewshot = list(fewshot)
         self.limit = limit
         self.memory_provider = memory_provider
+        self.memory_policy = memory_policy
 
     def _memory_block(self, trigger: Trigger) -> str:
         if self.memory_provider is None:
+            return ""
+        if self.memory_policy is not None and not self.memory_policy(trigger.message.text):
             return ""
         try:
             return self.memory_provider(trigger) or ""

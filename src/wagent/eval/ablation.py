@@ -109,11 +109,14 @@ def memory_block_for(
     vector_index=None,
     embedder=None,
 ) -> str:
-    """构造记忆注入块（B 组 prompt 使用；可选向量召回）。"""
+    """构造记忆注入块（B 组 prompt 使用；可选向量召回；按意图策略决定是否注入）。"""
     from datetime import datetime
 
+    from wagent.agent.intent import needs_memory
     from wagent.memory.retrieval import MemoryQuery, MemoryRetriever
 
+    if not needs_memory(latest):
+        return ""
     retriever = MemoryRetriever(store, vector_index=vector_index, embedder=embedder)
     query = MemoryQuery(person=person, latest_text=latest, now=datetime.now().astimezone())
     return retriever.build(query).to_prompt_block()

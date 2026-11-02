@@ -119,6 +119,47 @@ def parse_intent_json(raw: str) -> IntentResult | None:
     return IntentResult(Intent(value), max(0.0, min(1.0, confidence)), "llm")
 
 
+# 记忆注入的触发词：问到"之前/上次/配置/几点/哪/多少"这类才值得翻记忆
+RECALL_HINTS = (
+    "记得",
+    "之前",
+    "上次",
+    "以前",
+    "说过",
+    "聊过",
+    "配置",
+    "显卡",
+    "几点",
+    "哪天",
+    "哪里",
+    "哪儿",
+    "多少",
+    "什么",
+    "怎么样",
+    "咋样",
+    "约好",
+    "安排",
+    "地址",
+    "生日",
+    "名字",
+)
+
+
+def needs_memory(text: str, intent: IntentResult | None = None) -> bool:
+    """按意图决定要不要注入层级记忆（避免闲聊里塞无关事实答非所问）。
+
+    - 提问 / 约时间：注入（可能涉及历史信息）；
+    - 语气词 / 敏感话题：不注入；
+    - 其他闲聊：只有话里出现"回忆类"关键词才注入。
+    """
+    result = intent or classify_rules(text)
+    if result.intent in (Intent.NO_REPLY, Intent.SENSITIVE):
+        return False
+    if result.intent in (Intent.QUESTION, Intent.PLAN):
+        return True
+    return any(hint in text for hint in RECALL_HINTS)
+
+
 @dataclass
 class IntentRouter:
     """规则优先、LLM 兜底的意图路由。"""

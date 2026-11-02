@@ -25,7 +25,7 @@ from datetime import datetime
 
 from wagent import config as config_module
 from wagent.actuator import SafeSender, SendMode, TypingProfile
-from wagent.agent.intent import IntentRouter
+from wagent.agent.intent import IntentRouter, needs_memory
 from wagent.agent.runtime import AgentRuntime, ChatModel, LLMGenerator, TickResult
 from wagent.agent.state import ConversationState
 from wagent.guard import check_output
@@ -149,6 +149,7 @@ def build_runtime(args: argparse.Namespace, mode: SendMode, tracer=None) -> Agen
         profile=load_profile(settings.paths.profile_path),
         fewshot=load_fewshot(settings.paths.fewshot_dir),
         memory_provider=memory_for,
+        memory_policy=needs_memory,
     )
 
     typing = TypingProfile(**settings.typing.model_dump(exclude={"send_key"}))

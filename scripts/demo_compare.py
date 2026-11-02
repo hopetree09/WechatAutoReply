@@ -24,7 +24,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from wagent.actuator import SafeSender, SendMode, SendPlan, SendResult, TypingProfile  # noqa: E402
-from wagent.agent.intent import IntentRouter  # noqa: E402
+from wagent.agent.intent import IntentRouter, needs_memory  # noqa: E402
 from wagent.agent.runtime import AgentRuntime, LLMGenerator  # noqa: E402
 from wagent.agent.state import ConversationState  # noqa: E402
 from wagent.config import get_settings  # noqa: E402
@@ -162,6 +162,8 @@ def run_runtime_demo(llm, retriever, profile: str, fewshot: list[str]) -> None:
     }
 
     def memory_for(trigger) -> str:
+        if not needs_memory(trigger.message.text):
+            return ""
         query = MemoryQuery(
             person=trigger.session or SESSION,
             latest_text=trigger.message.text,
@@ -170,7 +172,12 @@ def run_runtime_demo(llm, retriever, profile: str, fewshot: list[str]) -> None:
         return retriever.build(query).to_prompt_block()
 
     generator = LLMGenerator(
-        llm, profile=profile, fewshot=fewshot, limit=12, memory_provider=memory_for
+        llm,
+        profile=profile,
+        fewshot=fewshot,
+        limit=12,
+        memory_provider=memory_for,
+        memory_policy=needs_memory,
     )
     for name, frames in scenarios.items():
         sender = FakeSender()
@@ -213,11 +220,13 @@ def main() -> int:
     print("三组对比：A 裸模型 / B +自动画像 / C +画像+层级记忆（上下文为脚本手写）")
     print("=" * 72)
     for case in CASES:
-        mem = memory_block(retriever, case.latest)
+        inject = needs_memory(case.latest)
+        mem = memory_block(retriever, case.latest) if inject else ""
         reply_a = generate(llm, case, profile="", fewshot=[], memory="")
         reply_b = generate(llm, case, profile=profile, fewshot=fewshot, memory="")
         reply_c = generate(llm, case, profile=profile, fewshot=fewshot, memory=mem)
         rows.append(Row(case=case, a=reply_a, b=reply_b, c=reply_c, hit=bool(mem.strip())))
+        print(f"  [memory] 注入={bool(mem.strip())} needs_memory={inject}")
         print("\n" + "-" * 72)
         print(f"[{case.topic}] 对方: {case.latest}")
         print(f"  A 裸模型     : {reply_a}")
