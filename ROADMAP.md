@@ -102,7 +102,8 @@
 ## P3 · 评测 + 可观测（5~6 天）
 
 > 进度：规则指标 ✅（风格相似度/AI 味/长度/复读）、LLM 评委 ✅（成对比较+交换抵消位置偏差）、
-> A/B 报告 ✅、trace 可观测 ✅（perceive/generate/send/tick 耗时落 JSONL）、消融实验 ⏳
+> A/B 报告 ✅、trace 可观测 ✅（perceive/generate/send/tick 耗时落 JSONL）、
+> 消融实验 ✅（记忆 on/off：规则综合分 0.587→0.625，盲评小样本无显著差异）
 
 ## P3.5 · LoRA 风格微调（本次新增）
 

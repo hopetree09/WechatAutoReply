@@ -1,0 +1,145 @@
+{
+  "n": 12,
+  "model": "qwen2.5:7b-instruct-q4_K_M",
+  "memory_hit_rate": 1.0,
+  "base_metrics": {
+    "n": 12,
+    "score": 0.587,
+    "style": 0.189,
+    "ai_flavor": 0.025,
+    "length": 0.994
+  },
+  "memory_metrics": {
+    "n": 12,
+    "score": 0.625,
+    "style": 0.251,
+    "ai_flavor": 0.0,
+    "length": 1.0
+  },
+  "base_wins": 5,
+  "memory_wins": 3,
+  "ties": 4,
+  "memory_win_rate": 0.375,
+  "details": [
+    {
+      "latest": "你能帮我写个脚本吗",
+      "base": {
+        "reply": "可以啊，需要做什么的？把需求说清楚～"
+      },
+      "memory": {
+        "reply": "可以啊 大厂的活我做不来那算啥～"
+      },
+      "winner": "A"
+    },
+    {
+      "latest": "你周末干嘛",
+      "base": {
+        "reply": "宅着 补觉呢 😴"
+      },
+      "memory": {
+        "reply": "哈哈 我这周日打篮球～你搬得咋样了？"
+      },
+      "winner": "A"
+    },
+    {
+      "latest": "今晚有空吗",
+      "base": {
+        "reply": "有啊，咋了？"
+      },
+      "memory": {
+        "reply": "可以 你定地方～"
+      },
+      "winner": "A"
+    },
+    {
+      "latest": "今天加班到十点",
+      "base": {
+        "reply": "惨 睡得早些哈"
+      },
+      "memory": {
+        "reply": "天天十点真的挺辛苦的～"
+      },
+      "winner": "A"
+    },
+    {
+      "latest": "你周末干嘛",
+      "base": {
+        "reply": "就喜欢宅在家看剧，你呢？有猫猫的照片吗？"
+      },
+      "memory": {
+        "reply": "打球呗，你呢～"
+      },
+      "winner": "B"
+    },
+    {
+      "latest": "我在字节实习",
+      "base": {
+        "reply": "实习挺好的吧？学到了啥新东西没？"
+      },
+      "memory": {
+        "reply": "加班挺多的，你那边咋样～"
+      },
+      "winner": "tie"
+    },
+    {
+      "latest": "我换工作了",
+      "base": {
+        "reply": "去了一家新公司，挺不错的～"
+      },
+      "memory": {
+        "reply": "哦，换工作了？挺好的，去字节跳动了？🚀"
+      },
+      "winner": "tie"
+    },
+    {
+      "latest": "你周末干嘛",
+      "base": {
+        "reply": "我就打算在家捣鼓捣鼓我的小项目，你呢～"
+      },
+      "memory": {
+        "reply": "约你打球了，周六你搬家我去帮忙～周日放松一下，想宅着补觉😂"
+      },
+      "winner": "A"
+    },
+    {
+      "latest": "这个价格合理吗",
+      "base": {
+        "reply": "偏高，再压一压吧～"
+      },
+      "memory": {
+        "reply": "偏高 再压一压～"
+      },
+      "winner": "tie"
+    },
+    {
+      "latest": "晚上一起吃饭？",
+      "base": {
+        "reply": "好呀，晚上一起吃个饭聊聊～"
+      },
+      "memory": {
+        "reply": "可以，你定地～"
+      },
+      "winner": "tie"
+    },
+    {
+      "latest": "我下个月搬去滨江",
+      "base": {
+        "reply": "搬去滨江啊，那边环境应该不错吧，有空带我看看新家哦～"
+      },
+      "memory": {
+        "reply": "可以 你定地方～"
+      },
+      "winner": "B"
+    },
+    {
+      "latest": "最近怎么样",
+      "base": {
+        "reply": "还行，就是忙得不像话～最近项目多得让我喘不过气来。你那边有啥打算没？"
+      },
+      "memory": {
+        "reply": "还行，你辞职了有打算吗～"
+      },
+      "winner": "B"
+    }
+  ]
+}
