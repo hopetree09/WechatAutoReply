@@ -71,6 +71,8 @@ flowchart LR
 | LLM 抽记忆会编造 | 强制 `evidence_msg_id`，证据不在输入里直接丢弃；同 key 新值自动 supersede 旧值 |
 | 聊天内容上传云端有隐私顾虑 | 默认本地 Ollama；云端 DeepSeek 作为可选通道；embedding/记忆全在本地 SQLite |
 | 一开自动发送就把内容打进别的程序 | `dry_run/review/send` 三级；点击前后各校验一次前台窗口；剪贴板保存恢复；失败原因可解释 |
+| 每条都回显得很傻 / 金钱话题危险 | 意图路由（规则 + 可选 LLM 兜底）：语气词/表情 `NO_REPLY`、金钱隐私 `SENSITIVE` 直接不回 |
+| 模型可能说出不该说的话 | 输出护栏：金钱/验证码关键词拦截、手机号/身份证/邮箱/卡号脱敏、复述对方原话拦截、超长拦截 |
 | 不知道模型变好没有 | 规则指标（风格相似度/AI 味/长度/复读）+ LLM 评委成对比较（交换位置抵消偏差）+ A/B 报告 |
 | 不知道一轮卡在哪 | 轻量 trace：perceive/generate/send/tick 的毫秒与动作写 JSONL，`--trace` 一键开启 |
 
@@ -87,9 +89,9 @@ python -m wagent.main --mock --fake-llm
 
 # 2) 接本地模型跑真实窗口（默认 dry-run：只打印不发送）
 ollama pull qwen2.5:7b-instruct-q4_K_M
-python -m wagent.main            # 截图 → OCR → 触发 → 生成 → 预览
+python -m wagent.main            # 截图 → OCR → 触发/意图 → 生成 → 护栏 → 预览
 
-# 3) 人工确认后发送
+# 3) 人工确认后发送（意图路由与安全护栏默认开启；--no-intent/--no-guard 可关）
 python -m wagent.main --mode review
 
 # 4) 导入历史聊天（两种来源，任选）
@@ -119,8 +121,9 @@ src/wagent/
 ├── winapi.py          # DPI 感知、点击/滚动/剪贴板、前台窗口
 ├── perception/        # 感知层：窗口/截图/OCR/解析/说话人/区域/输入框/自动标定/帧缓存
 ├── im/                # IM 适配层：WeChatAdapter（真实窗口）+ MockAdapter（离线/CI）
-├── agent/             # 触发状态机 + 运行时（感知→决策→生成→发送）
+├── agent/             # 触发状态机 + 意图路由 + 运行时（感知→决策→生成→护栏→发送）
 ├── llm/               # 双通道客户端（本地/云端）+ prompt 构建 + 出口清洗
+├── guard/             # 输出护栏：金钱/隐私拦截、PII 脱敏、注入检测
 ├── actuator.py        # 安全执行：dry_run/review/send、拟人打字、前台校验
 ├── memory/            # L0-L5：SQLite 存储、分层检索、记忆巩固、向量索引(bge-m3)
 ├── importers/         # CSV 导入、滚动 OCR 采史、时间戳解析

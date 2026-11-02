@@ -11,10 +11,20 @@ def test_mock_demo_dry_run(capsys) -> None:
     assert code == 0
     assert "backend=mock" in out
     assert "mode=dry_run" in out
-    # 基线帧不回；随后一条对方新消息产生预览；自己的回复出现后不再回
+    # 基线帧不回；两条对方新消息产生预览；中间「嗯」被意图路由跳过
     assert out.count("预览·未发送") == 2
+    assert "跳过" in out and "无需回复" in out
     assert "无新消息" in out
     assert "已发送" not in out
+
+
+def test_mock_demo_with_no_intent(capsys) -> None:
+    """关掉意图路由后，「嗯」也会被当成正常消息处理。"""
+    code = main(["--mock", "--fake-llm", "--no-intent", "--no-guard", "--interval", "0"])
+    out = capsys.readouterr().out
+    assert code == 0
+    assert out.count("预览·未发送") == 3
+    assert "跳过" not in out
 
 
 def test_mock_demo_send_mode_blocked_by_foreground_guard(capsys) -> None:

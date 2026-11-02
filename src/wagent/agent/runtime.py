@@ -13,7 +13,9 @@ from dataclasses import dataclass, field
 from typing import Literal
 
 from wagent.actuator import SafeSender, SendMode, SendResult
+from wagent.agent.intent import Intent, IntentRouter
 from wagent.agent.state import ConversationState, Trigger
+from wagent.guard import GuardResult
 from wagent.im.base import IMAdapter
 from wagent.llm.client import ChatModel, ChatResult, LLMError
 from wagent.llm.prompt import build_messages, clean_reply
@@ -42,6 +44,7 @@ class TickResult:
     reply: str = ""
     send: SendResult | None = None
     error: str = ""
+    note: str = ""
 
     @property
     def ok(self) -> bool:
@@ -56,8 +59,8 @@ class TickResult:
             elapsed = f"（{self.send.elapsed_s:.1f}s）" if self.send else ""
             return f"[已发送{elapsed}] {self.reply}"
         if self.action == "skipped":
-            reason = self.send.reason if self.send else ""
-            return f"[跳过] {self.reply or reason}"
+            reason = self.note or (self.send.reason if self.send else "")
+            return f"[跳过] {reason}".rstrip()
         return f"[失败] {self.error}"
 
 
@@ -111,6 +114,8 @@ class AgentRuntime:
     mode: SendMode = SendMode.DRY_RUN
     on_event: Callable[[TickResult], None] | None = field(default=None, repr=False)
     tracer: Tracer | None = field(default=None, repr=False)
+    intent_router: IntentRouter | None = field(default=None, repr=False)
+    guard: Callable[[str, tuple[str, ...]], GuardResult] | None = field(default=None, repr=False)
 
     def _trace(self, kind: str, **data: object) -> None:
         if self.tracer is not None:
@@ -149,6 +154,27 @@ class AgentRuntime:
             session=trigger.session,
         )
 
+        # 1) 意图路由：不该回的消息直接跳过（语气词/表情/金钱隐私）
+        if self.intent_router is not None:
+            decision = self.intent_router.classify(trigger.message.text)
+            self._trace(
+                "intent",
+                intent=decision.intent.value,
+                confidence=decision.confidence,
+                reason=decision.reason,
+            )
+            if decision.intent in (Intent.NO_REPLY, Intent.SENSITIVE):
+                self.state.skip()
+                self._span("tick", tick_started, action="skipped")
+                note = (
+                    "无需回复（语气词/表情）"
+                    if decision.intent is Intent.NO_REPLY
+                    else "敏感话题（金钱/隐私），不自动回复"
+                )
+                return self._emit(
+                    TickResult("skipped", trigger=trigger, note=note)
+                )
+
         generate_started = time.perf_counter()
         try:
             reply = self.generate(trigger)
@@ -161,6 +187,29 @@ class AgentRuntime:
             self._trace("error", stage="generate", error=str(exc))
             self.state.fail()
             return self._emit(TickResult("failed", trigger=trigger, error=f"生成异常: {exc}"))
+
+        # 2) 输出护栏：金钱/隐私/复述/超长拦截，PII 脱敏
+        #    复述检测只和「对方说过的话」比，不能把自己的历史回复当成复读
+        if self.guard is not None:
+            from wagent.perception.types import Speaker
+
+            context_texts = (
+                *(m.text for m in trigger.context if m.speaker is not Speaker.ME),
+                trigger.message.text,
+            )
+            verdict = self.guard(reply, context_texts)
+            self._trace(
+                "guard",
+                allowed=verdict.allowed,
+                reason=verdict.reason,
+            )
+            if not verdict.allowed:
+                self.state.skip()
+                self._span("tick", tick_started, action="skipped")
+                return self._emit(
+                    TickResult("skipped", trigger=trigger, reply=reply, note=verdict.reason)
+                )
+            reply = verdict.safe_text
 
         if not reply.strip():
             self.state.skip()

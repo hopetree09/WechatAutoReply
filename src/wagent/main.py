@@ -25,8 +25,10 @@ from datetime import datetime
 
 from wagent import config as config_module
 from wagent.actuator import SafeSender, SendMode, TypingProfile
+from wagent.agent.intent import IntentRouter
 from wagent.agent.runtime import AgentRuntime, ChatModel, LLMGenerator, TickResult
 from wagent.agent.state import ConversationState
+from wagent.guard import check_output
 from wagent.im.base import Frame, IMAdapter
 from wagent.im.mock import MockAdapter
 from wagent.llm.client import ChatResult, LLMClient
@@ -65,14 +67,15 @@ def _msg(speaker: Speaker, text: str) -> Message:
 
 
 def build_mock_frames() -> list[Frame]:
-    """一段脚本化对话：基线 → 新消息 → 自己的回复出现 → 对方再发一条。"""
+    """一段脚本化对话：基线 → 新消息 → 自己的回复出现 → 语气词（跳过）→ 新消息。"""
     other, me = Speaker.OTHER, Speaker.ME
     session = "路旁的树"
     return [
         Frame([_msg(other, "在吗")], session),
         Frame([_msg(other, "在吗"), _msg(other, "今晚有空吗")], session),
         Frame([_msg(other, "在吗"), _msg(other, "今晚有空吗"), _msg(me, FAKE_REPLY)], session),
-        Frame([_msg(other, "今晚有空吗"), _msg(me, FAKE_REPLY), _msg(other, "那就八点")], session),
+        Frame([_msg(other, "今晚有空吗"), _msg(me, FAKE_REPLY), _msg(other, "嗯")], session),
+        Frame([_msg(me, FAKE_REPLY), _msg(other, "嗯"), _msg(other, "那就八点")], session),
     ]
 
 
@@ -155,6 +158,17 @@ def build_runtime(args: argparse.Namespace, mode: SendMode, tracer=None) -> Agen
         require_foreground=settings.agent.require_foreground,
         confirm=_review_confirm,
     )
+    # 意图路由与安全护栏（默认开启；--no-intent / --no-guard 可关）
+    intent_router = None
+    if not getattr(args, "no_intent", False):
+        use_llm = bool(getattr(args, "llm_intent", False))
+        intent_router = IntentRouter(llm=llm if use_llm else None, use_llm=use_llm)
+    guard = None
+    if not getattr(args, "no_guard", False):
+
+        def guard(reply: str, contexts: tuple[str, ...]):
+            return check_output(reply, context_texts=contexts)
+
     return AgentRuntime(
         adapter=adapter,
         state=ConversationState(),
@@ -162,6 +176,8 @@ def build_runtime(args: argparse.Namespace, mode: SendMode, tracer=None) -> Agen
         generate=generator,
         mode=mode,
         tracer=tracer,
+        intent_router=intent_router,
+        guard=guard,
     )
 
 
@@ -221,6 +237,9 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--ticks", type=int, default=0, help="跑固定轮数后退出（0=无限）")
     parser.add_argument("--interval", type=float, default=None, help="轮询间隔（秒）")
     parser.add_argument("--trace", action="store_true", help="把每轮耗时/动作写入 data/trace/*.jsonl")
+    parser.add_argument("--no-intent", action="store_true", help="关闭意图路由（默认开启规则版）")
+    parser.add_argument("--llm-intent", action="store_true", help="意图路由叠加 LLM 兜底（慢一点）")
+    parser.add_argument("--no-guard", action="store_true", help="关闭输出安全护栏（默认开启）")
     return parser.parse_args(argv)
 
 
