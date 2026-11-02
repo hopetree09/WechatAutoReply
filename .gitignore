@@ -1,4 +1,4 @@
-# ── 密钥与本地配置（绝不进仓库）────────────────────────────
+﻿# ── 密钥与本地配置（绝不进仓库）────────────────────────────
 .env
 .env.*
 !.env.example
@@ -20,6 +20,9 @@ data/lora/
 data/train/
 data/train_synth/
 data/train_demo/
+data/train_real/
+data/eval/real/
+data/eval/real2/
 data/trace/
 data/raw/
 models/

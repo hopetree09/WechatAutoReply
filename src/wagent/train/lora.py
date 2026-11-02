@@ -1,4 +1,4 @@
-﻿"""3B QLoRA 风格微调（Qwen2.5-3B-Instruct + PEFT）。
+"""3B QLoRA 风格微调（Qwen2.5-3B-Instruct + PEFT）。
 
 为什么要微调：RAG/画像能解决「记得住」，但「说话像不像我」在短句、标点、口头禅上
 更吃模型本身。所以：**知识走记忆库，口吻走 LoRA**。
@@ -118,6 +118,8 @@ def train_lora(config: LoraConfig) -> dict:
 
     started = time.time()
     train_rows = read_chatml(config.train_file)
+    if config.max_samples:
+        train_rows = train_rows[: config.max_samples]
     tokenizer = AutoTokenizer.from_pretrained(config.base_model, trust_remote_code=True)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token

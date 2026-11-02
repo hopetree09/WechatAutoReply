@@ -35,15 +35,18 @@ from wagent.memory.types import (
 EXTRACT_SYSTEM = """你是记忆抽取器。从聊天记录中抽取**可以长期记住**的事实，输出 JSON。
 
 规则：
-- 只抽稳定、可复用的事实：身份、关系、工作/学习、偏好、计划、约定、重要经历、雷区。
-- 不要抽临时寒暄（"在吗""哈哈"）、不要推测、不要编造。
+- 从聊天里抽取「值得长期记住」的信息，**至少尝试 1~5 条**；确实整段都是无信息闲聊时才返回 []。
+- 可抽：人物关系/称呼、近况、计划与约定、偏好与习惯、重要经历、情绪触发点/雷区、常用说法。
+- 如果一段对话主要在讨论某个话题，也要记成事实（例如 subject="对方"，predicate="关注/态度"，value="..."）。
+- **禁止**逐条给消息打情绪标签、**禁止**输出「对话内容/情绪」这类字段。
+- 不要抽纯寒暄（"在吗""哈哈"）、不要推测、不要编造。
 - 每条事实必须引用它来自哪条消息的 id（evidence_id 只能取输入里出现的 id）。
 - about 字段：这条事实描述的是「我」(me) 还是「对方」(other)。
 - 置信度 confidence：0~1，原话明确才给 0.8 以上。
-- 最多 8 条，没有就返回空数组。
+- 最多 8 条。
 
 只输出 JSON 数组，不要解释：
-[{"subject":"张伟","predicate":"计划搬家","value":"10月底搬到滨江","evidence_id":"msg_xxx","confidence":0.9,"about":"other"}]"""
+[{"subject":"某人的名字","predicate":"计划搬家","value":"10月底搬到滨江","evidence_id":"msg_xxx","confidence":0.9,"about":"other"}]"""
 
 SUMMARY_SYSTEM = """你是聊天摘要器。把给定聊天记录压缩成 1~2 句中文摘要，只保留事件、情绪、约定、待办。
 只输出摘要本身，不要任何前缀。"""
@@ -84,8 +87,24 @@ def _render_messages(messages: Sequence[MessageRecord]) -> str:
     return "\n".join(rows)
 
 
+def _repair_json(text: str) -> str:
+    """修复小模型常见 JSON 毛病：key 不带引号、单引号、尾逗号。"""
+    fixed = re.sub(
+        r"([{,]\s*)([A-Za-z_\u4e00-\u9fff][A-Za-z0-9_\u4e00-\u9fff]*)\s*:",
+        r'\1"\2":',
+        text,
+    )
+    fixed = re.sub(
+        r"'([^'\\]*(?:\\.[^'\\]*)*)'",
+        lambda match: '"' + match.group(1).replace('"', '\\"') + '"',
+        fixed,
+    )
+    fixed = re.sub(r",\s*([}\]])", r"\1", fixed)
+    return fixed
+
+
 def parse_json_array(raw: str) -> list[dict[str, Any]]:
-    """从模型输出里抠出 JSON 数组（容忍 ```json 代码块与前后废话）。"""
+    """从模型输出里抠出 JSON 数组（容忍代码块、前后废话、key 不带引号等小毛病）。"""
     text = (raw or "").strip()
     if not text:
         return []
@@ -95,11 +114,17 @@ def parse_json_array(raw: str) -> list[dict[str, Any]]:
     start, end = text.find("["), text.rfind("]")
     if start == -1 or end <= start:
         return []
-    try:
-        data = json.loads(text[start : end + 1])
-    except json.JSONDecodeError:
+    body = text[start : end + 1]
+    data: Any = None
+    for candidate in (body, _repair_json(body)):
+        try:
+            data = json.loads(candidate)
+            break
+        except json.JSONDecodeError:
+            continue
+    if not isinstance(data, list):
         return []
-    return [item for item in data if isinstance(item, dict)] if isinstance(data, list) else []
+    return [item for item in data if isinstance(item, dict)]
 
 
 @dataclass
@@ -120,7 +145,7 @@ class FactExtractor:
         result = self.llm.chat(
             [MessageTurn("system", EXTRACT_SYSTEM), MessageTurn("user", user)],
             temperature=0.1,
-            max_tokens=800,
+            max_tokens=1000,
         )
         return self._to_cards(person, result.text, messages)
 
@@ -177,6 +202,7 @@ class Consolidator:
     store: MemoryStore
     extractor: FactExtractor
     summarize: bool = True
+    batch_size: int = 60
     _now: Any = field(default=None, repr=False)
 
     def consolidate_person(
@@ -187,7 +213,12 @@ class Consolidator:
         if not records:
             return result
 
-        cards = self.extractor.extract(person, records)
+        # 分批抽取：单次塞太多消息会让模型只回 []，150 条一批效果更稳
+        cards: list[FactCard] = []
+        for start in range(0, len(records), self.batch_size):
+            batch = records[start : start + self.batch_size]
+            cards.extend(self.extractor.extract(person, batch))
+
         active = {
             (fact.subject, fact.predicate): fact
             for fact in self.store.active_facts(person, limit=500)

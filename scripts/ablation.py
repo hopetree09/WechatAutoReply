@@ -41,13 +41,13 @@ from wagent.memory.store import MemoryStore  # noqa: E402
 PERSON = "张伟"
 
 
-def build_case_prompts(cases, *, profile, fewshot, store, with_memory: bool, vector_index=None, embedder=None):
+def build_case_prompts(cases, *, profile, fewshot, store, with_memory: bool, person: str = PERSON, vector_index=None, embedder=None):
     """返回与 cases 等长的 [(system, user)] 列表。"""
     prompts = []
     for case in cases:
         memory_block = (
             memory_block_for(
-                store, PERSON, case.latest, vector_index=vector_index, embedder=embedder
+                store, person, case.latest, vector_index=vector_index, embedder=embedder
             )
             if with_memory
             else ""
@@ -121,6 +121,8 @@ def main() -> int:
     parser.add_argument("--limit", type=int, default=12)
     parser.add_argument("--judge-model", default="qwen2.5:7b-instruct-q4_K_M")
     parser.add_argument("--out", default=str(ROOT / "data" / "eval"))
+    parser.add_argument("--person", default=PERSON, help="联系人群（记忆库里的 person key）")
+    parser.add_argument("--db", default="", help="用真实记忆库（如 data/agent.db）；不填则用合成演示记忆")
     args = parser.parse_args()
 
     val_path = Path(args.data)
@@ -137,11 +139,22 @@ def main() -> int:
     profile = load_profile(settings.paths.profile_path)
     fewshot = load_fewshot(settings.paths.fewshot_dir)
 
-    store = MemoryStore(":memory:")
-    style_bank = [case.reference for case in cases] + [
-        "行吧 先这样", "问题不大 我看看", "有啊 咋了", "可以 你定", "哈哈 也行",
-    ]
-    seed_memory_store(store, style_samples=style_bank)
+    person = args.person
+    if args.db:
+        db_path = Path(args.db)
+        if not db_path.exists():
+            print(f"[!] 记忆库不存在：{db_path}")
+            return 2
+        store = MemoryStore(db_path)
+        style_bank = [sample.text for sample in store.style_samples(person='__self__', limit=200)]
+        style_bank += [case.reference for case in cases]
+        print(f"[ablation] 真实记忆库：{db_path}，person={person}，风格样本={len(style_bank)}")
+    else:
+        store = MemoryStore(":memory:")
+        style_bank = [case.reference for case in cases] + [
+            "行吧 先这样", "问题不大 我看看", "有啊 咋了", "可以 你定", "哈哈 也行",
+        ]
+        seed_memory_store(store, style_samples=style_bank)
 
     # 用本地 bge-m3 建向量索引，让 B 组走完整的混合检索
     vector_index = embedder = None
@@ -155,7 +168,7 @@ def main() -> int:
         print(f"[ablation] 向量检索不可用（退回关键词/recency）：{exc}")
 
     base_prompts = build_case_prompts(
-        cases, profile=profile, fewshot=fewshot, store=store, with_memory=False
+        cases, profile=profile, fewshot=fewshot, store=store, with_memory=False, person=person
     )
     memory_prompts = build_case_prompts(
         cases,
@@ -163,6 +176,7 @@ def main() -> int:
         fewshot=fewshot,
         store=store,
         with_memory=True,
+        person=person,
         vector_index=vector_index,
         embedder=embedder,
     )

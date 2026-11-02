@@ -68,6 +68,8 @@ python scripts/consolidate.py --db data/demo_agent.db --person 张伟 --index --
 
 ## 4. 3B LoRA A/B 评测（base vs adapter）
 
+### 4.1 合成数据（链路验证）
+
 ```powershell
 python scripts/train_lora.py --synth --data data/train_synth --out data/lora/qwen25-3b-style
 python scripts/eval_ab.py --adapter data/lora/qwen25-3b-style --data data/train_synth/val.jsonl
@@ -82,16 +84,47 @@ python scripts/judge_replies.py        # 生成结束后单独跑，避开显存
 | 长度自然度 | 1.00 | 1.00 |
 | LLM 盲评（10 例） | 4 胜 | **5 胜**（1 平，胜率 55.6%） |
 
-评委典型样例：
+### 4.2 真实数据（最终结果）
+
+```powershell
+# 1) 导入 Moect 导出的 JSONL（28,869 条真实文本消息，3 年）
+python -m wagent.import_chat inspect --file data\raw\<导出目录>\xxx.jsonl --person <联系人>
+python -m wagent.import_chat json    --file data\raw\<导出目录>\xxx.jsonl --person <联系人>
+
+# 2) 记忆巩固 + 向量索引（77 条事实 / 4 条事件 / 300 风格样本 / 332 向量）
+python scripts/consolidate.py --person <联系人> --limit 1200 --index
+
+# 3) 真实训练集（10,759 对 Q/A，切 9,684 train / 1,075 val）
+python scripts/export_training_data.py --person <联系人> --out data/train_real
+
+# 4) 800 条真实样本训练 3B QLoRA（10.5 分钟）
+python scripts/train_lora.py --data data/train_real --out data/lora/qwen25-3b-real --limit-samples 800
+
+# 5) A/B 生成 + 盲评
+python scripts/eval_ab.py --adapter data/lora/qwen25-3b-real --data data/train_real/val.jsonl --limit 15 --out data/eval/real
+python scripts/judge_replies.py --report data/eval/real/ab_report.json --limit 15
+```
+
+| 指标 | base | 真实 LoRA |
+|---|---|---|
+| 综合分 | 0.468 | **0.505** |
+| AI 味 | 0.22 | **0.00** |
+| 风格相似度（对短回复不敏感） | 0.056 | 0.021 |
+| LLM 盲评（15 例） | 1 胜 | **10 胜**（4 平，**胜率 90.9%**） |
+
+评委样例（`data/eval/real/judge_report.md` 有完整 15 条）：
 
 ```
-base  : 当然可以，把具体的代码和问题描述给我，我来帮你搞定。
-LoRA  : 你先说功能需求
-base  : 哎呀，那可真不错，新工作咋样？
-LoRA  : 挺好的
+base : 好的，我知道了。                                 → 负
+LoRA : 嗯嗯                                             → 胜
+base : 那我直接去考场了，考试结束后咱们再复习吧。          → 负
+LoRA : [强]                                             → 胜
+base : 哈哈，都是因为你！下午见，得赶紧去准备一下，不然都来不及了。 → 平（位置偏差抵消）
 ```
 
-> ⚠️ 训练数据是**合成数据**（228 条），指标只证明链路可用；真实效果需真实聊天记录重训。
+> 真实训练数据：2.9 万条消息（其中我的回复 1.15 万条），平均 8.3 字、中位数 5 字、
+> 句号率 0.1%——所以 LoRA 学到的核心就是「极短、口语、不加句号」，盲评也印证了这一点。
+> 训练只用了 800 条子集（受限单轮时间），全量 9,684 对可继续加训。
 
 ## 5. 消融实验：有 / 无层级记忆
 
@@ -114,20 +147,34 @@ python scripts/ablation.py --limit 12
   说明「记忆有没有用」必须用真实聊天数据验证，不能拿合成数据自嗨；
 - 这本身是评测体系的价值：**它没有替项目吹结论，而是暴露了问题**。
 
+**真实数据复跑**（`python scripts/ablation.py --db data/agent.db --person <联系人> --person` 用真实记忆库，
+库里有 77 条带证据事实、4 条事件、300 条风格样本）：
+
+```
+[ablation] 真实记忆库：data\agent.db，person=<联系人>，风格样本=212
+[ablation] 无记忆：{'n': 12, 'score': 0.529, 'style': 0.058, 'ai_flavor': 0.0, 'length': 1.0}
+[ablation] 有记忆：{'n': 12, 'score': 0.533, 'style': 0.069, 'ai_flavor': 0.0, 'length': 0.993}
+[ablation] 盲评：无记忆 5 / 有记忆 2 / 平 5
+```
+
+结论：**短句闲聊场景里记忆注入收益不明显**；记忆真正的价值在「回忆事实/约定」，
+应该用回忆类问题单独评测（已列入后续工作）。
+
 ## 6. 复现清单
 
 ```powershell
-pytest -q                              # 200+ 单测
+pytest -q                              # 全量单测
 ruff check src tests scripts && mypy   # 静态检查
 python scripts/probe_window.py         # 现场诊断：窗口/截图/OCR/输入框/配色
+python -m wagent.import_chat inspect --file <导出文件>   # 探测格式并给出导入命令
 ```
 
-产物索引：
+产物索引（真实数据相关产物含隐私，已在 `.gitignore` 中排除）：
 
 | 文件 | 内容 |
 |---|---|
-| `data/eval/ab_report.md` | LoRA A/B 规则指标 |
-| `data/eval/judge_report.md` | LLM 盲评逐条结果 |
-| `data/eval/ablation_report.md` | 记忆消融实验 |
-| `data/trace/*.jsonl` | 每轮耗时/动作 trace |
-| `data/lora/qwen25-3b-style/` | LoRA adapter（本地，不入库） |
+| `data/eval/real/ab_report.md` | 真实 LoRA A/B 规则指标（本地） |
+| `data/eval/real/judge_report.md` | 真实 A/B LLM 盲评逐条结果（本地） |
+| `data/eval/real2/ablation_report.md` | 真实库记忆消融（本地） |
+| `data/trace/*.jsonl` | 每轮耗时/动作 trace（本地） |
+| `data/lora/qwen25-3b-real/` | 真实数据 LoRA adapter（本地，不入库） |
