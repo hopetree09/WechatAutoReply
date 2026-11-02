@@ -19,6 +19,7 @@ import sys
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
@@ -144,7 +145,15 @@ class FakeSender(SafeSender):
         super().__init__(TypingProfile(), require_foreground=False)
         self.calls: list[tuple[str, SendMode]] = []
 
-    def send(self, text: str, *, target_hwnd: int, click_point, mode: SendMode):
+    def send(
+        self,
+        text: str,
+        *,
+        target_hwnd: int,
+        click_point: tuple[int, int],
+        mode: SendMode = SendMode.DRY_RUN,
+        confirm=None,
+    ):
         self.calls.append((text, mode))
         plan = SendPlan(text=text, estimated_typing_s=0.0, think_delay_s=0.0, chunks=(text,))
         return SendResult(sent=True, reason="faked", elapsed_s=0.0, plan=plan)
@@ -239,6 +248,7 @@ def main() -> int:
     settings = get_settings()
     profile = load_profile(settings.paths.profile_path)
     fewshot = load_fewshot(settings.paths.fewshot_dir)
+    llm: Any
     if args.provider == "lora":
         from wagent.train.lora import LoraChatModel
 
@@ -322,10 +332,9 @@ def main() -> int:
         wins = {"A 裸模型": 0, "C +画像+记忆": 0, "平": 0}
         for row in rows:
             result = judge.compare(
-                context_text="\n".join(f"{who}: {text}" for who, text in row.case.context),
-                reference=row.case.latest,
-                reply_a=row.a,
-                reply_b=row.c,
+                "\n".join(f"{who}: {text}" for who, text in row.case.context),
+                row.a,
+                row.c,
             )
             winner = "平" if result.winner == "tie" else ("C +画像+记忆" if result.winner == "b" else "A 裸模型")
             wins[winner] += 1

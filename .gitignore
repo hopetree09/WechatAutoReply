@@ -24,6 +24,7 @@ data/train_real/
 data/train_real_matched/
 data/eval/real/
 data/eval/real2/
+data/eval/two_stage/
 data/trace/
 data/raw/
 models/
