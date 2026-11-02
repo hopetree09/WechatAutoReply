@@ -1,0 +1,253 @@
+{
+  "n": 10,
+  "a_wins": 0,
+  "b_wins": 0,
+  "ties": 10,
+  "b_win_rate": 0.0,
+  "base_metrics": {
+    "n": 10,
+    "score": 0.455,
+    "style": 0.014,
+    "ai_flavor": 0.21,
+    "length": 1.0
+  },
+  "tuned_metrics": {
+    "n": 10,
+    "score": 0.51,
+    "style": 0.02,
+    "ai_flavor": 0.0,
+    "length": 1.0
+  },
+  "details": [
+    {
+      "latest": "你能帮我写个脚本吗",
+      "context_text": "最近聊天记录：\n对方: 这个价格合理吗\n我: 偏高 再压一压\n我: 我在字节实习\n对方: 这个报错咋解决\n我: 你先把日志贴出来\n对方: 你能帮我写个脚本吗\n\n对方刚发来：你能帮我写个脚本吗\n\n请以我的口吻回复（只输出回复内容）：",
+      "reference": "可以 需求说清楚😅",
+      "base": {
+        "reply": "当然可以，把具体的代码和问题描述给我，我来帮你搞定。",
+        "style": 0.04,
+        "ai_flavor": 0.3,
+        "length": 1.0,
+        "repetition": 1.0,
+        "score": 0.445
+      },
+      "tuned": {
+        "reply": "你先说功能需求",
+        "style": 0.091,
+        "ai_flavor": 0.0,
+        "length": 1.0,
+        "repetition": 1.0,
+        "score": 0.545
+      },
+      "winner": "tie",
+      "reason": ""
+    },
+    {
+      "latest": "你周末干嘛",
+      "context_text": "最近聊天记录：\n我: 看需求 不急着上😅\n我: 今晚有空吗\n我: 帮我带杯咖啡\n对方: 你周末干嘛\n我: 宅着 补觉\n我: 我下个月搬去滨江\n\n对方刚发来：你周末干嘛\n\n请以我的口吻回复（只输出回复内容）：",
+      "reference": "收到",
+      "base": {
+        "reply": "没什么特别的，就是想多睡会儿。",
+        "style": 0.0,
+        "ai_flavor": 0.3,
+        "length": 1.0,
+        "repetition": 1.0,
+        "score": 0.425
+      },
+      "tuned": {
+        "reply": "看个展 放风筝",
+        "style": 0.0,
+        "ai_flavor": 0.0,
+        "length": 1.0,
+        "repetition": 1.0,
+        "score": 0.5
+      },
+      "winner": "tie",
+      "reason": ""
+    },
+    {
+      "latest": "今晚有空吗",
+      "context_text": "最近聊天记录：\n对方: 我改天请你吃饭\n我: 行 记着了\n我: 收到\n对方: 在干嘛\n对方: 今晚有空吗\n我: 有啊 咋了\n\n对方刚发来：今晚有空吗\n\n请以我的口吻回复（只输出回复内容）：",
+      "reference": "周末一起打球？",
+      "base": {
+        "reply": "有啊，咋样？",
+        "style": 0.0,
+        "ai_flavor": 0.0,
+        "length": 1.0,
+        "repetition": 1.0,
+        "score": 0.5
+      },
+      "tuned": {
+        "reply": "有啊 出去喝一杯？",
+        "style": 0.0,
+        "ai_flavor": 0.0,
+        "length": 1.0,
+        "repetition": 1.0,
+        "score": 0.5
+      },
+      "winner": "tie",
+      "reason": ""
+    },
+    {
+      "latest": "今天加班到十点",
+      "context_text": "最近聊天记录：\n对方: 在忙吗\n我: 还好 说\n对方: 今天加班到十点\n我: 惨 早点睡\n我: 我脱单了\n我: 今天好累\n\n对方刚发来：今天加班到十点\n\n请以我的口吻回复（只输出回复内容）：",
+      "reference": "收到",
+      "base": {
+        "reply": "嗯，我也挺晚才走的，明天还得早起呢。",
+        "style": 0.059,
+        "ai_flavor": 0.3,
+        "length": 1.0,
+        "repetition": 1.0,
+        "score": 0.454
+      },
+      "tuned": {
+        "reply": "明天早起看日出 🌄",
+        "style": 0.111,
+        "ai_flavor": 0.0,
+        "length": 1.0,
+        "repetition": 1.0,
+        "score": 0.555
+      },
+      "winner": "tie",
+      "reason": ""
+    },
+    {
+      "latest": "你周末干嘛",
+      "context_text": "最近聊天记录：\n我: 最近在学什么\n对方: 我在字节实习\n我: 可以啊 大厂\n对方: 我养了两只猫\n我: 橘猫吗 肯定很胖\n对方: 你周末干嘛\n\n对方刚发来：你周末干嘛\n\n请以我的口吻回复（只输出回复内容）：",
+      "reference": "确实",
+      "base": {
+        "reply": "周末想在家看看书或者和朋友视频聊天放松一下。",
+        "style": 0.042,
+        "ai_flavor": 0.3,
+        "length": 1.0,
+        "repetition": 1.0,
+        "score": 0.446
+      },
+      "tuned": {
+        "reply": "看个剧 放松一下",
+        "style": 0.0,
+        "ai_flavor": 0.0,
+        "length": 1.0,
+        "repetition": 1.0,
+        "score": 0.5
+      },
+      "winner": "tie",
+      "reason": ""
+    },
+    {
+      "latest": "我在字节实习",
+      "context_text": "最近聊天记录：\n对方: 我辞职了\n我: 想好了就行\n对方: 最近怎么样\n我: 还行 忙成狗\n我: 最近在学什么\n对方: 我在字节实习\n\n对方刚发来：我在字节实习\n\n请以我的口吻回复（只输出回复内容）：",
+      "reference": "可以啊 大厂",
+      "base": {
+        "reply": "挺好的，我在学点新东西呢。你那边工作顺利吗？",
+        "style": 0.0,
+        "ai_flavor": 0.3,
+        "length": 1.0,
+        "repetition": 1.0,
+        "score": 0.425
+      },
+      "tuned": {
+        "reply": "能带我实习吗",
+        "style": 0.0,
+        "ai_flavor": 0.0,
+        "length": 1.0,
+        "repetition": 1.0,
+        "score": 0.5
+      },
+      "winner": "tie",
+      "reason": ""
+    },
+    {
+      "latest": "我换工作了",
+      "context_text": "最近聊天记录：\n我: 最近没看 你先说\n我: 你上次说的那个方案呢\n对方: 在干嘛\n我: 摸鱼呢😂\n对方: 我换工作了\n我: 哦？去哪了🤣\n\n对方刚发来：我换工作了\n\n请以我的口吻回复（只输出回复内容）：",
+      "reference": "明天开会吗",
+      "base": {
+        "reply": "哎呀，那可真不错，新工作咋样？",
+        "style": 0.0,
+        "ai_flavor": 0.0,
+        "length": 1.0,
+        "repetition": 1.0,
+        "score": 0.5
+      },
+      "tuned": {
+        "reply": "挺好的",
+        "style": 0.0,
+        "ai_flavor": 0.0,
+        "length": 1.0,
+        "repetition": 1.0,
+        "score": 0.5
+      },
+      "winner": "tie",
+      "reason": ""
+    },
+    {
+      "latest": "你周末干嘛",
+      "context_text": "最近聊天记录：\n我: 我改天请你吃饭\n对方: 这个项目靠谱吗\n我: 看需求 不急着上\n对方: 你能帮我写个脚本吗\n我: 哈哈\n对方: 你周末干嘛\n\n对方刚发来：你周末干嘛\n\n请以我的口吻回复（只输出回复内容）：",
+      "reference": "宅着 补觉😂",
+      "base": {
+        "reply": "我打算出去转转，顺便看看新书。",
+        "style": 0.0,
+        "ai_flavor": 0.3,
+        "length": 1.0,
+        "repetition": 1.0,
+        "score": 0.425
+      },
+      "tuned": {
+        "reply": "听歌🤣",
+        "style": 0.0,
+        "ai_flavor": 0.0,
+        "length": 1.0,
+        "repetition": 1.0,
+        "score": 0.5
+      },
+      "winner": "tie",
+      "reason": ""
+    },
+    {
+      "latest": "这个价格合理吗",
+      "context_text": "最近聊天记录：\n对方: 你睡了吗\n我: 还没\n对方: 北京下雨了\n对方: 我下个月搬去滨江\n对方: 这个价格合理吗\n我: 偏高 再压一压\n\n对方刚发来：这个价格合理吗\n\n请以我的口吻回复（只输出回复内容）：",
+      "reference": "周末一起打球？",
+      "base": {
+        "reply": "这个价格还是有点偏高，再便宜点看吧。",
+        "style": 0.0,
+        "ai_flavor": 0.3,
+        "length": 1.0,
+        "repetition": 1.0,
+        "score": 0.425
+      },
+      "tuned": {
+        "reply": "便宜点",
+        "style": 0.0,
+        "ai_flavor": 0.0,
+        "length": 1.0,
+        "repetition": 1.0,
+        "score": 0.5
+      },
+      "winner": "tie",
+      "reason": ""
+    },
+    {
+      "latest": "晚上一起吃饭？",
+      "context_text": "最近聊天记录：\n对方: 你怎么看这个事\n我: 我倾向于先做小范围验证🐶\n我: 我下个月搬去滨江\n对方: 这个价格合理吗\n对方: 最近在学什么\n对方: 晚上一起吃饭？\n\n对方刚发来：晚上一起吃饭？\n\n请以我的口吻回复（只输出回复内容）：",
+      "reference": "可以 你定地方",
+      "base": {
+        "reply": "好呀，周六晚上见！",
+        "style": 0.0,
+        "ai_flavor": 0.0,
+        "length": 1.0,
+        "repetition": 1.0,
+        "score": 0.5
+      },
+      "tuned": {
+        "reply": "行 改天定个时间",
+        "style": 0.0,
+        "ai_flavor": 0.0,
+        "length": 1.0,
+        "repetition": 1.0,
+        "score": 0.5
+      },
+      "winner": "tie",
+      "reason": ""
+    }
+  ]
+}

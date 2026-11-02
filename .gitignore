@@ -14,6 +14,13 @@ data/memory/
 data/calibration.json
 data/agent.db
 data/agent.db-*
+data/*.db
+data/*.db-*
+data/lora/
+data/train/
+data/train_synth/
+data/train_demo/
+data/raw/
 models/
 *.gguf
 *.safetensors
