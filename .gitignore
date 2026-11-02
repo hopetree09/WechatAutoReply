@@ -8,7 +8,7 @@ config_secret.py
 
 # ── 个人数据（聊天记录 / 口吻样本 / 自述画像 / 记忆库）─────────
 data/raw/
-data/fewshot/
+data/fewshot/*.txt
 data/profile.md
 data/memory/
 
