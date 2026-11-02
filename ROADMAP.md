@@ -21,8 +21,8 @@
 
 ## P0 · 打地基 + 修硬伤（3~4 天）
 
-> 进度：P0-1 ✅ / P0-2 ✅ / P0-3 ✅ / P0-5 ⏳ / P0.5 ✅（输入框自动定位）/ P0-4 ⏳ / P0-6 ⏳
-> 已落地：`src/wagent/perception/`（窗口/截图/OCR/解析/说话人/区域/输入框/自动标定）+ 38 个单测 + `scripts/probe_window.py`
+> 进度：P0-1 ✅ / P0-2 ✅ / P0-3 ✅ / P0.5 ✅（输入框自动定位）/ P0-4 ✅ / P0-6 ✅ / P0-5 ⏳（帧缓存已做，异步 OCR 待做）
+> 已落地：`src/wagent/`（perception + agent + im + llm + actuator）、107 个单测、ruff/mypy 全绿、GitHub Actions CI、`python -m wagent.main --mock` 离线演示
 
 目标：**感知准、触发对、默认不安全的东西全关掉**，后面所有能力都建在这上面。
 

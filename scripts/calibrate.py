@@ -17,18 +17,15 @@ from __future__ import annotations
 
 import os
 import sys
-import time
 from pathlib import Path
 
 # 让脚本从 scripts/ 目录运行时也能 import 项目根目录的模块
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-import cv2
-import numpy as np
-from pynput import mouse
-
 import config
+import cv2
 from core.capture import Capturer
+from pynput import mouse
 
 
 def _list_windows() -> None:
@@ -78,12 +75,12 @@ def main() -> None:
     def on_click(x, y, button, pressed):
         if not pressed:
             return
-        l, t, r, b = win32gui.GetWindowRect(hwnd)
-        if not (l <= x <= r and t <= y <= b):
+        left, top, right, bottom = win32gui.GetWindowRect(hwnd)
+        if not (left <= x <= right and top <= y <= bottom):
             print(f"  (点击在窗口外 ({x},{y})，已忽略)")
             return
         # frame 是物理像素；pynput 坐标在 100% 缩放时等于物理像素
-        fx, fy = x - l, y - t
+        fx, fy = x - left, y - top
         if 0 <= fx < frame.shape[1] and 0 <= fy < frame.shape[0]:
             px = frame[fy, fx]  # BGR
             rgb = (int(px[2]), int(px[1]), int(px[0]))

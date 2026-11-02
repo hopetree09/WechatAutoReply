@@ -1,4 +1,4 @@
-"""气泡配色自动标定（自举学习），让项目不依赖手工配置颜色。
+﻿"""气泡配色自动标定（自举学习），让项目不依赖手工配置颜色。
 
 背景：微信 4.x 改版后气泡绿实际是 RGB(157, 242, 159)（旧版 3.x 是 149/236/105），
 写死颜色必然失效；深色主题、自定义主题就更不用说了。
@@ -51,7 +51,7 @@ class BubblePalette:
             return None if value is None else (int(value[0]), int(value[1]), int(value[2]))
 
         return cls(
-            background_bgr=_tup(data["background_bgr"]),  # type: ignore[arg-type]
+            background_bgr=_tup(data["background_bgr"]),
             my_bgr=_tup(data.get("my_bgr")),
             other_bgr=_tup(data.get("other_bgr")),
         )
@@ -147,7 +147,7 @@ def _collect_side_colors(
             mean = _patch_mean(img, patch)
             if mean is None:
                 continue
-            color = (int(round(mean[0])), int(round(mean[1])), int(round(mean[2])))
+            color = (round(mean[0]), round(mean[1]), round(mean[2]))
             if _color_distance(color, background) < min_background_distance:
                 continue
             if side == "me":
@@ -180,7 +180,7 @@ def _cluster_colors(
     for key, count in counter.most_common(top_n):
         near = [s for s in samples if all(abs(s[i] - key[i]) <= bin_size * 2 for i in range(3))]
         mean = np.mean(np.array(near, dtype=float), axis=0)
-        color = (int(round(mean[0])), int(round(mean[1])), int(round(mean[2])))
+        color = (round(mean[0]), round(mean[1]), round(mean[2]))
         clusters.append((color, count))
     return clusters
 
@@ -229,7 +229,7 @@ def _collect_all_colors(
             mean = _patch_mean(img, patch)
             if mean is None:
                 continue
-            color = (int(round(mean[0])), int(round(mean[1])), int(round(mean[2])))
+            color = (round(mean[0]), round(mean[1]), round(mean[2]))
             if _color_distance(color, background) < min_background_distance:
                 continue
             colors.append(color)
@@ -297,11 +297,7 @@ class PaletteStore:
         self.path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
     def match(self, background_bgr: np.ndarray | tuple[int, int, int], *, tolerance: float = 12.0):
-        target = (
-            (int(background_bgr[0]), int(background_bgr[1]), int(background_bgr[2]))
-            if not isinstance(background_bgr, np.ndarray)
-            else (int(background_bgr[0]), int(background_bgr[1]), int(background_bgr[2]))
-        )
+        target = (int(background_bgr[0]), int(background_bgr[1]), int(background_bgr[2]))
         best: tuple[float, BubblePalette] | None = None
         for palette in self.load():
             dist = _color_distance(palette.background_bgr, target)

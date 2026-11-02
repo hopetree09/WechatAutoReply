@@ -1,4 +1,4 @@
-"""Windows 平台基础能力：DPI 感知、前台窗口、点击与键盘。
+﻿"""Windows 平台基础能力：DPI 感知、前台窗口、点击与键盘。
 
 统一在进程启动时开启 Per-Monitor V2 DPI 感知，之后的截图坐标（物理像素）
 和点击坐标（物理像素）才会一致——旧实现没有做这一步，缩放非 100% 时点击必偏。
@@ -6,10 +6,11 @@
 
 from __future__ import annotations
 
+import contextlib
 import ctypes
 import time
 
-_user32 = ctypes.WinDLL("user32", use_last_error=True)  # type: ignore[attr-defined]
+_user32 = ctypes.WinDLL("user32", use_last_error=True)
 
 _DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 = ctypes.c_void_p(-4)
 
@@ -19,17 +20,15 @@ def enable_dpi_awareness() -> None:
     try:
         _user32.SetProcessDpiAwarenessContext(_DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2)
         return
-    except Exception:  # noqa: BLE001
+    except Exception:
         pass
     try:
         # 旧系统兜底：shcore.SetProcessDpiAwareness(2)
-        shcore = ctypes.WinDLL("shcore", use_last_error=True)  # type: ignore[attr-defined]
+        shcore = ctypes.WinDLL("shcore", use_last_error=True)
         shcore.SetProcessDpiAwareness(2)
-    except Exception:  # noqa: BLE001
-        try:
+    except Exception:
+        with contextlib.suppress(Exception):
             _user32.SetProcessDPIAware()
-        except Exception:  # noqa: BLE001
-            pass
 
 
 def foreground_hwnd() -> int:
@@ -43,7 +42,7 @@ def window_title(hwnd: int) -> str:
 
     try:
         return win32gui.GetWindowText(hwnd)
-    except Exception:  # noqa: BLE001
+    except Exception:
         return ""
 
 
@@ -77,7 +76,7 @@ def read_clipboard() -> str:
 
     try:
         return pyperclip.paste() or ""
-    except Exception:  # noqa: BLE001
+    except Exception:
         return ""
 
 

@@ -11,12 +11,12 @@ from __future__ import annotations
 
 import hashlib
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 
 import numpy as np
 
 
-class Speaker(str, Enum):
+class Speaker(StrEnum):
     ME = "me"
     OTHER = "other"
     UNKNOWN = "unknown"

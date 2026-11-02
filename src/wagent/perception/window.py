@@ -57,7 +57,7 @@ def _process_name(hwnd: int) -> str:
             return str(win32process.GetModuleFileNameEx(handle, 0)).split("\\")[-1]
         finally:
             win32api.CloseHandle(handle)
-    except Exception:  # noqa: BLE001 - 取不到进程名不影响主流程
+    except Exception:
         return ""
 
 
@@ -75,7 +75,7 @@ def list_windows() -> list[WindowInfo]:
             return True
         try:
             left, top, right, bottom = win32gui.GetWindowRect(hwnd)
-        except Exception:  # noqa: BLE001
+        except Exception:
             return True
         out.append(
             WindowInfo(

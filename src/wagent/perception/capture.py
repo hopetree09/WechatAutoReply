@@ -1,4 +1,4 @@
-"""截图后端。
+﻿"""截图后端。
 
 微信 4.x 是 Qt5 窗口（类名形如 ``Qt51514QWindowIcon``），实测
 ``PrintWindow(hwnd, hdc, PW_RENDERFULLCONTENT)`` 可以在**窗口被遮挡、不在前台**时
@@ -20,8 +20,8 @@ import numpy as np
 
 from wagent.config import CaptureSettings
 
-_user32 = ctypes.WinDLL("user32", use_last_error=True)  # type: ignore[attr-defined]
-_gdi32 = ctypes.WinDLL("gdi32", use_last_error=True)  # type: ignore[attr-defined]
+_user32 = ctypes.WinDLL("user32", use_last_error=True)
+_gdi32 = ctypes.WinDLL("gdi32", use_last_error=True)
 
 _user32.GetWindowRect.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.RECT)]
 _user32.GetWindowRect.restype = wintypes.BOOL
@@ -170,6 +170,5 @@ class WindowCapturer:
         return self._grab_mss()
 
     def _grab_mss(self) -> np.ndarray:
-        import mss
 
         raise CaptureError("mss 后端需要窗口坐标，请改用 printwindow/dxcam")

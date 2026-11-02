@@ -1,0 +1,33 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install
+        run: |
+          python -m pip install -U pip
+          pip install -e ".[dev]"
+
+      - name: Lint (ruff)
+        run: ruff check src tests scripts
+
+      - name: Type check (mypy, windows platform)
+        run: mypy
+
+      - name: Tests
+        run: pytest -q
+
+  # 真实窗口/OCR/键鼠相关用例需要 Windows + 微信，只在本机跑
+  # （scripts/probe_window.py 用于现场诊断，不进入 CI）

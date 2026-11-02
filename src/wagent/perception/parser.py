@@ -16,7 +16,6 @@ import re
 import statistics
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
-from enum import Enum, auto
 from typing import Literal
 
 from wagent.perception.types import Box, Message, OcrLine, Speaker, row_bucket

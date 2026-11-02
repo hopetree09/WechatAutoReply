@@ -48,11 +48,13 @@ def locate_by_uia(hwnd: int, *, min_width: int = 120, min_height: int = 24) -> I
     """
     try:
         import uiautomation as auto
-    except Exception:  # noqa: BLE001 - 未安装/平台不支持则降级
+    except Exception:
         return None
 
     try:
         root = auto.ControlFromHandle(hwnd)
+        if root is None:
+            return None
         window_rect = root.BoundingRectangle
         win_h = window_rect.bottom - window_rect.top
         if win_h <= 0:
@@ -66,14 +68,14 @@ def locate_by_uia(hwnd: int, *, min_width: int = 120, min_height: int = 24) -> I
             visited += 1
             try:
                 children = ctrl.GetChildren()
-            except Exception:  # noqa: BLE001
+            except Exception:
                 continue
             for child in children:
                 stack.append(child)
                 try:
                     name = child.ControlTypeName
                     rect = child.BoundingRectangle
-                except Exception:  # noqa: BLE001
+                except Exception:
                     continue
                 width = rect.right - rect.left
                 height = rect.bottom - rect.top
@@ -96,7 +98,7 @@ def locate_by_uia(hwnd: int, *, min_width: int = 120, min_height: int = 24) -> I
             method="uia",
             confidence=0.95,
         )
-    except Exception:  # noqa: BLE001
+    except Exception:
         return None
 
 
