@@ -10,29 +10,26 @@ from __future__ import annotations
 
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
-from typing import Literal, Protocol
+from typing import Literal
 
 from wagent.actuator import SafeSender, SendMode, SendResult
 from wagent.agent.state import ConversationState, Trigger
 from wagent.im.base import IMAdapter
-from wagent.llm.client import ChatResult, LLMError
+from wagent.llm.client import ChatModel, ChatResult, LLMError
 from wagent.llm.prompt import build_messages, clean_reply
 
 Action = Literal["no_trigger", "preview", "replied", "skipped", "failed"]
 
 Generator = Callable[[Trigger], str]
 
-
-class ChatModel(Protocol):
-    """只依赖 ``chat()`` 的模型协议，真实客户端与假模型都能满足。"""
-
-    def chat(
-        self,
-        messages: Sequence,
-        *,
-        temperature: float | None = None,
-        max_tokens: int | None = None,
-    ) -> ChatResult: ...
+__all__ = [
+    "AgentRuntime",
+    "ChatModel",
+    "ChatResult",
+    "Generator",
+    "LLMGenerator",
+    "TickResult",
+]
 
 
 @dataclass(slots=True)

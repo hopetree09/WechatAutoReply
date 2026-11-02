@@ -40,6 +40,7 @@ dev = [
 
 [project.scripts]
 wagent = "wagent.main:main"
+wagent-import = "wagent.import_chat:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

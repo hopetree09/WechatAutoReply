@@ -88,6 +88,8 @@ class Message:
     box: Box
     confidence: float = 1.0
     session: str = ""
+    # 屏幕上最近的时间戳（如「昨天 21:03」），解析器从上往下继承
+    ts_text: str = ""
     # 行位置分桶：用于去重时区分「同一句话在不同时间/位置再次出现」
     row_bucket: int = 0
 

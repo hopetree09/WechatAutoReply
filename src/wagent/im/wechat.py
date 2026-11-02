@@ -62,6 +62,11 @@ class WeChatAdapter:
     def input_box(self) -> InputBox | None:
         return self._input
 
+    @property
+    def message_rect(self) -> Box | None:
+        """最近一次计算出的消息区（采史时用来定位滚动中心）。"""
+        return self._msg_rect
+
     def capture(self) -> Frame:
         img = self.capturer.grab(self.window.hwnd)
         self.last_image = img

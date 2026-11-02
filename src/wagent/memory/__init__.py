@@ -8,13 +8,17 @@
 - L5 风格样本：真实说过的句子（``style_samples``，后续可加向量检索）
 """
 
+from wagent.memory.consolidate import Consolidator, FactCandidate, FactExtractor
 from wagent.memory.retrieval import MemoryContext, MemoryQuery, MemoryRetriever
 from wagent.memory.store import MemoryStore
 from wagent.memory.types import Episode, FactCard, MessageRecord, PersonProfile, StyleSample
 
 __all__ = [
+    "Consolidator",
     "Episode",
+    "FactCandidate",
     "FactCard",
+    "FactExtractor",
     "MemoryContext",
     "MemoryQuery",
     "MemoryRetriever",

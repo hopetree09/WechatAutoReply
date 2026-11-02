@@ -181,6 +181,8 @@ def parse_ocr_lines(
     cfg = cfg or ParseConfig()
     extent_cache: dict[int, tuple[int, int] | None] = {}
     group_extent: dict[int, tuple[int, int] | None] = {}
+    group_ts: dict[int, str] = {}
+    pending_ts = ""
 
     # 1. 过滤噪声行
     valid: list[OcrLine] = []
@@ -209,6 +211,10 @@ def parse_ocr_lines(
 
     for ln in valid:
         kind = classify_text(ln.text)
+        if kind == "timestamp":
+            pending_ts = normalize_text(ln.text)
+            current = None
+            continue
         if kind != "message":
             current = None
             continue
@@ -243,6 +249,7 @@ def parse_ocr_lines(
                 continue
         current = _Group(speaker=speaker, lines=[ln])
         group_extent[id(current)] = _extent_of(ln)
+        group_ts[id(current)] = pending_ts
         groups.append(current)
 
     # 4. 组内合并成消息
@@ -268,6 +275,7 @@ def parse_ocr_lines(
                 confidence=round(conf, 3),
                 session=session,
                 row_bucket=row_bucket(group.first.box.cy),
+                ts_text=group_ts.get(id(group), pending_ts),
             )
         )
     return messages

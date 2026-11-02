@@ -187,12 +187,13 @@ class MemoryStore:
             ).fetchone()
             if exists:
                 continue
-            self._conn.execute(
-                "INSERT INTO messages(id, person, speaker, text, ts, session, source, fingerprint) "
+            cursor = self._conn.execute(
+                "INSERT OR IGNORE INTO messages(id, person, speaker, text, ts, session, source, fingerprint) "
                 "VALUES(?,?,?,?,?,?,?,?)",
                 (rec.id, rec.person, rec.speaker, rec.text, rec.ts, rec.session, rec.source, fp),
             )
-            inserted += 1
+            if cursor.rowcount > 0:
+                inserted += 1
         self._conn.commit()
         return inserted
 

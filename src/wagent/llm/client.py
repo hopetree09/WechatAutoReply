@@ -12,9 +12,21 @@ from __future__ import annotations
 import time
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Protocol
 
 from wagent.config import LlmSettings
+
+
+class ChatModel(Protocol):
+    """模型协议：只依赖 ``chat()``；真实客户端、假模型、录制回放都满足。"""
+
+    def chat(
+        self,
+        messages: Sequence[Any],
+        *,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+    ) -> ChatResult: ...
 
 
 class LLMError(RuntimeError):

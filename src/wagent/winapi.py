@@ -1,4 +1,4 @@
-﻿"""Windows 平台基础能力：DPI 感知、前台窗口、点击与键盘。
+"""Windows 平台基础能力：DPI 感知、前台窗口、点击与键盘、滚轮与剪贴板。
 
 统一在进程启动时开启 Per-Monitor V2 DPI 感知，之后的截图坐标（物理像素）
 和点击坐标（物理像素）才会一致——旧实现没有做这一步，缩放非 100% 时点击必偏。
@@ -68,6 +68,22 @@ def press(key: str, *, settle: float = 0.1) -> None:
 
     pyautogui.PAUSE = 0.05
     pyautogui.press(key)
+    time.sleep(settle)
+
+
+def move_mouse(x: int, y: int, *, settle: float = 0.15) -> None:
+    """把鼠标移到物理像素坐标（滚动历史前先把指针放到聊天区上方）。"""
+    import pyautogui
+
+    pyautogui.moveTo(int(x), int(y))
+    time.sleep(settle)
+
+
+def scroll(clicks: int, *, settle: float = 0.35) -> None:
+    """滚轮：正数向上、负数向下。"""
+    import pyautogui
+
+    pyautogui.scroll(int(clicks))
     time.sleep(settle)
 
 
