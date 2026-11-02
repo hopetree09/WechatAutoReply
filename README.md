@@ -1,4 +1,4 @@
-# wagent · 桌面微信 GUI Agent（带层级记忆）
+﻿# wagent · 桌面微信 GUI Agent（带层级记忆）
 
 > **不 hook、不注入、不解密、不碰微信进程内存**：用「截屏 + OCR」感知屏幕，用「键鼠模拟」回复，
 > 用本地大模型 + 分层记忆让回复「记得住事、像本人」。
@@ -126,7 +126,7 @@ src/wagent/
 ├── guard/             # 输出护栏：金钱/隐私拦截、PII 脱敏、注入检测
 ├── actuator.py        # 安全执行：dry_run/review/send、拟人打字、前台校验
 ├── memory/            # L0-L5：SQLite 存储、分层检索、记忆巩固、向量索引(bge-m3)
-├── importers/         # CSV 导入、滚动 OCR 采史、时间戳解析
+├── importers/         # CSV/JSON(L) 导入、导出格式探测、滚动 OCR 采史、时间戳解析
 ├── train/             # 训练集构造、合成数据、QLoRA 训练、推理
 ├── eval/              # 规则指标 + LLM 评委 + A/B
 ├── observability/     # 轻量 trace（每轮耗时/动作/错误 → JSONL）
@@ -205,7 +205,8 @@ LLM 盲评 5 : 3 : 4（无记忆胜/有记忆胜/平）——样本小且合成 
 trace 可观测。
 
 > 简历/面试材料见 [docs/RESUME.md](./docs/RESUME.md)；关键取舍见
-> [docs/DESIGN_DECISIONS.md](./docs/DESIGN_DECISIONS.md)。
+> [docs/DESIGN_DECISIONS.md](./docs/DESIGN_DECISIONS.md)；真实聊天记录采集与导入见
+> [docs/DATA_EXPORT.md](./docs/DATA_EXPORT.md)。
 
 ## License
 

@@ -26,10 +26,11 @@ from wagent.perception.parser import classify_text
 
 TS_ALIASES = ("StrTime", "时间", "time", "createTime", "CreateTime", "TalkTime", "Date", "datetime")
 TEXT_ALIASES = ("StrContent", "内容", "content", "msg", "Message", "StrMsg", "text", "消息")
-SENDER_ALIASES = ("IsSender", "是否发送", "isSender", "is_sender", "SenderIsMe")
-SPEAKER_ALIASES = ("Sender", "NickName", "发送人", "speaker", "Nick", "StrSender")
+SENDER_ALIASES = ("IsSender", "是否发送", "是否我发送", "isSender", "is_sender", "SenderIsMe")
+SPEAKER_ALIASES = ("Sender", "NickName", "发送人", "发送者", "speaker", "Nick", "StrSender")
 TYPE_ALIASES = ("Type", "MsgType", "消息类型", "类型", "msgType", "Type_")
-PERSON_ALIASES = ("StrTalker", "Talker", "好友", "contact", "person", "ChatName")
+PERSON_ALIASES = ("StrTalker", "Talker", "好友", "contact", "person", "ChatName", "会话", "session")
+ID_ALIASES = ("消息ID", "server_id", "serverid", "MsgSvrID", "msgid", "local_id")
 
 # 微信 3.x/4.x 里 Type=1 是文本，其余为媒体/系统
 TEXT_TYPES = {"1", "text", "txt", "文本", "文字"}
@@ -84,6 +85,7 @@ class ColumnMapping:
     speaker: str | None = None
     msg_type: str | None = None
     person: str | None = None
+    msg_id: str | None = None
 
     @classmethod
     def autodetect(cls, headers: Sequence[str]) -> ColumnMapping:
@@ -94,6 +96,7 @@ class ColumnMapping:
             speaker=_find_column(headers, SPEAKER_ALIASES),
             msg_type=_find_column(headers, TYPE_ALIASES),
             person=_find_column(headers, PERSON_ALIASES),
+            msg_id=_find_column(headers, ID_ALIASES),
         )
 
     def validate(self, headers: Sequence[str]) -> None:
@@ -155,6 +158,21 @@ class CsvImporter:
             if record is not None:
                 result.messages.append(record)
 
+        # 只有「发送者昵称」列、没有「是否我发送」列时，必须能认出哪个昵称是"我"，
+        # 否则所有消息都会被静默当成对方说的 —— 这里显式告警。
+        if mapping.speaker and not mapping.is_sender:
+            me_lower = {name.lower() for name in self.me_names}
+            matched = sum(
+                1
+                for row in rows
+                if (row.get(mapping.speaker) or "").strip().lower() in me_lower
+            )
+            if matched == 0:
+                result.warnings.append(
+                    f"CSV 没有『是否我发送』列，且 --me 名单 {list(self.me_names)} 没命中任何发送者："
+                    "所有消息都会被当成对方说的。请用 --me \"你的微信昵称\" 重新导入。"
+                )
+
         # 同一时间戳 + 内容的重复行去重（部分导出会重复）
         seen: set[tuple[str, str]] = set()
         deduped: list[MessageRecord] = []
@@ -174,16 +192,17 @@ class CsvImporter:
         person: str,
         result: ImportResult,
     ) -> MessageRecord | None:
-        text = (row.get(mapping.text or "") or "").strip()
-        if not text:
-            result.skipped_empty += 1
-            return None
-
+        # 先看类型再看文本：媒体消息的文本列经常为空，应记为「跳过媒体」而不是「空行」
         if mapping.msg_type:
             msg_type = (row.get(mapping.msg_type) or "").strip().lower()
             if msg_type and msg_type not in TEXT_TYPES:
                 result.skipped_media += 1
                 return None
+
+        text = (row.get(mapping.text or "") or "").strip()
+        if not text:
+            result.skipped_empty += 1
+            return None
 
         # 没有类型列时按文本特征过滤（[图片]/时间戳/系统提示）
         if not mapping.msg_type and classify_text(text) != "message":
@@ -196,6 +215,7 @@ class CsvImporter:
             return None
 
         speaker = self._speaker_of(row, mapping)
+        identifier = str(row.get(mapping.msg_id) or "").strip() if mapping.msg_id else ""
         return MessageRecord(
             person=person or "unknown",
             speaker=speaker,
@@ -203,6 +223,7 @@ class CsvImporter:
             ts=ts,
             session=person,
             source="import",
+            **({"id": f"csv_{identifier}"} if identifier else {}),
         )
 
     def _speaker_of(self, row: dict[str, str], mapping: ColumnMapping) -> str:
