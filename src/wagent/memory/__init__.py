@@ -9,21 +9,29 @@
 """
 
 from wagent.memory.consolidate import Consolidator, FactCandidate, FactExtractor
+from wagent.memory.embeddings import Embedder, HashingEmbedder, OllamaEmbedder
 from wagent.memory.retrieval import MemoryContext, MemoryQuery, MemoryRetriever
 from wagent.memory.store import MemoryStore
 from wagent.memory.types import Episode, FactCard, MessageRecord, PersonProfile, StyleSample
+from wagent.memory.vector import VectorHit, VectorIndex, rrf
 
 __all__ = [
     "Consolidator",
+    "Embedder",
     "Episode",
     "FactCandidate",
     "FactCard",
     "FactExtractor",
+    "HashingEmbedder",
     "MemoryContext",
     "MemoryQuery",
     "MemoryRetriever",
     "MemoryStore",
     "MessageRecord",
+    "OllamaEmbedder",
     "PersonProfile",
     "StyleSample",
+    "VectorHit",
+    "VectorIndex",
+    "rrf",
 ]

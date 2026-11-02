@@ -98,6 +98,18 @@ CREATE TABLE IF NOT EXISTS style_samples (
     fingerprint TEXT NOT NULL UNIQUE
 );
 CREATE INDEX IF NOT EXISTS idx_style_person ON style_samples(person);
+
+-- 向量索引：kind = episode | style | fact；vector 是 float32 的 BLOB
+CREATE TABLE IF NOT EXISTS embeddings (
+    item_id TEXT PRIMARY KEY,
+    kind TEXT NOT NULL,
+    person TEXT NOT NULL,
+    text TEXT NOT NULL,
+    vector BLOB NOT NULL,
+    dim INTEGER NOT NULL,
+    updated_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_embeddings_person ON embeddings(person, kind);
 """
 
 
@@ -439,3 +451,115 @@ class MemoryStore:
             )
             for row in rows
         ]
+
+    # ------------------------------------------------------------ 向量索引
+
+    def upsert_embedding(
+        self, *, item_id: str, kind: str, person: str, text: str, vector: bytes, dim: int
+    ) -> None:
+        self._conn.execute(
+            "INSERT OR REPLACE INTO embeddings(item_id, kind, person, text, vector, dim, updated_at) "
+            "VALUES(?,?,?,?,?,?,?)",
+            (item_id, kind, person, text, vector, dim, now_iso()),
+        )
+        self._conn.commit()
+
+    def fetch_embeddings(
+        self, *, person: str | None = None, kinds: Sequence[str] | None = None
+    ) -> list[sqlite3.Row]:
+        sql = "SELECT * FROM embeddings WHERE 1=1"
+        params: list[str] = []
+        if person:
+            sql += " AND person=?"
+            params.append(person)
+        if kinds:
+            sql += f" AND kind IN ({','.join('?' * len(kinds))})"
+            params.extend(kinds)
+        return self._conn.execute(sql, params).fetchall()
+
+    def count_embeddings(self, kind: str | None = None) -> int:
+        if kind:
+            row = self._conn.execute(
+                "SELECT COUNT(*) AS n FROM embeddings WHERE kind=?", (kind,)
+            ).fetchone()
+        else:
+            row = self._conn.execute("SELECT COUNT(*) AS n FROM embeddings").fetchone()
+        return int(row["n"])
+
+    def embedded_ids(self, kind: str) -> set[str]:
+        rows = self._conn.execute("SELECT item_id FROM embeddings WHERE kind=?", (kind,)).fetchall()
+        return {row["item_id"] for row in rows}
+
+    def unembedded_items(self, kind: str, *, limit: int = 500) -> list[tuple[str, str, str]]:
+        """返回还没有向量索引的 ``(id, person, text)``。"""
+        if kind == "episode":
+            sql = (
+                "SELECT id, person, summary AS text FROM episodes "
+                "WHERE id NOT IN (SELECT item_id FROM embeddings WHERE kind='episode') "
+                "ORDER BY ts DESC LIMIT ?"
+            )
+        elif kind == "style":
+            sql = (
+                "SELECT id, person, text FROM style_samples "
+                "WHERE id NOT IN (SELECT item_id FROM embeddings WHERE kind='style') "
+                "ORDER BY ts DESC LIMIT ?"
+            )
+        elif kind == "fact":
+            sql = (
+                "SELECT id, person, (subject || ' ' || predicate || '：' || value) AS text FROM facts "
+                "WHERE status='active' AND id NOT IN (SELECT item_id FROM embeddings WHERE kind='fact') "
+                "ORDER BY created_at DESC LIMIT ?"
+            )
+        else:
+            raise ValueError(f"未知 kind: {kind}")
+        rows = self._conn.execute(sql, (limit,)).fetchall()
+        return [(row["id"], row["person"], row["text"]) for row in rows]
+
+    def episodes_by_ids(self, ids: Sequence[str]) -> list[Episode]:
+        if not ids:
+            return []
+        placeholders = ",".join("?" * len(ids))
+        rows = self._conn.execute(
+            f"SELECT * FROM episodes WHERE id IN ({placeholders})", list(ids)
+        ).fetchall()
+        by_id = {
+            row["id"]: Episode(
+                id=row["id"],
+                person=row["person"],
+                summary=row["summary"],
+                ts=row["ts"],
+                topics=_load_list(row["topics"]),
+                msg_ids=_load_list(row["msg_ids"]),
+            )
+            for row in rows
+        }
+        return [by_id[item_id] for item_id in ids if item_id in by_id]
+
+    def style_samples_by_ids(self, ids: Sequence[str]) -> list[StyleSample]:
+        if not ids:
+            return []
+        placeholders = ",".join("?" * len(ids))
+        rows = self._conn.execute(
+            f"SELECT * FROM style_samples WHERE id IN ({placeholders})", list(ids)
+        ).fetchall()
+        by_id = {
+            row["id"]: StyleSample(
+                id=row["id"],
+                text=row["text"],
+                person=row["person"],
+                scene=row["scene"] or "",
+                ts=row["ts"] or "",
+            )
+            for row in rows
+        }
+        return [by_id[item_id] for item_id in ids if item_id in by_id]
+
+    def facts_by_ids(self, ids: Sequence[str]) -> list[FactCard]:
+        if not ids:
+            return []
+        placeholders = ",".join("?" * len(ids))
+        rows = self._conn.execute(
+            f"SELECT * FROM facts WHERE id IN ({placeholders})", list(ids)
+        ).fetchall()
+        by_id = {row["id"]: self._row_to_fact(row) for row in rows}
+        return [by_id[item_id] for item_id in ids if item_id in by_id]

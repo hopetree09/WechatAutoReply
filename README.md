@@ -32,6 +32,7 @@ flowchart LR
         M3[L2 人物画像 / L3 自我画像]
         M4[L4 事实卡·证据+有效期]
         M5[L5 风格样本]
+        M6[向量索引 bge-m3<br/>语义召回 + 时效融合]
     end
     subgraph 模型层
         LLM1[(本地 Qwen2.5-7B<br/>Ollama)]
@@ -43,12 +44,15 @@ flowchart LR
         FG[前台校验·剪贴板保护·拟人打字]
     end
     EV[评测层<br/>规则指标 + LLM 评委 + A/B]
+    TR[trace<br/>每轮耗时/动作/错误]
     S --> ST
     ST --> G
-    M1 & M2 & M3 & M4 & M5 --> G
+    M1 & M2 & M3 & M4 & M5 & M6 --> G
     G --> LLM1 & LLM2 & LORA
     G --> A --> FG
     G --> EV
+    ST --> TR
+    G --> TR
 ```
 
 ## 关键工程点（也是面试能讲的部分）
@@ -63,10 +67,12 @@ flowchart LR
 | 每轮都跑两次 OCR，一秒一次会占满 CPU | 消息区帧签名缓存 + 几何信息 TTL，窗口不变直接复用解析结果 |
 | 启动就回旧消息、重复内容永久失效、滚动误触发 | 显式状态机（BASELINE/IDLE/REPLYING/COOLDOWN）+ 尾部序列判断"追加 vs 滚动/抖动" |
 | 只回 12 句，记不住上周的事 | L0-L5 分层记忆：工作记忆/事件摘要/画像/事实卡/风格样本，按"相关性+时效+置信度"检索并做字符预算 |
+| 语义相关但很久以前的事想不起来 | 本地 bge-m3 向量索引 + `0.15×时间新鲜度 + 0.85×余弦相似度` 融合：问"工作"时 3 个月前的工作事件能排到第一 |
 | LLM 抽记忆会编造 | 强制 `evidence_msg_id`，证据不在输入里直接丢弃；同 key 新值自动 supersede 旧值 |
 | 聊天内容上传云端有隐私顾虑 | 默认本地 Ollama；云端 DeepSeek 作为可选通道；embedding/记忆全在本地 SQLite |
 | 一开自动发送就把内容打进别的程序 | `dry_run/review/send` 三级；点击前后各校验一次前台窗口；剪贴板保存恢复；失败原因可解释 |
 | 不知道模型变好没有 | 规则指标（风格相似度/AI 味/长度/复读）+ LLM 评委成对比较（交换位置抵消偏差）+ A/B 报告 |
+| 不知道一轮卡在哪 | 轻量 trace：perceive/generate/send/tick 的毫秒与动作写 JSONL，`--trace` 一键开启 |
 
 ## 快速开始
 
@@ -90,15 +96,19 @@ python -m wagent.main --mode review
 python -m wagent.import_chat csv   --file chat.csv --person 张三
 python -m wagent.import_chat scroll --person 张三 --max-frames 20
 
-# 5) 记忆巩固（LLM 抽事实 + 摘要），然后导出训练集
-python -c "from wagent.memory import *; ..."   # 见 docs 或 scripts
-python scripts/export_training_data.py --out data/train
+# 5) 记忆巩固（LLM 抽事实 + 摘要）并建向量索引（本地 bge-m3）
+python scripts/consolidate.py --person 张三 --index
 
-# 6) 训练 3B LoRA（8GB 显存 QLoRA）
+# 6) 导出训练集 → 训练 3B LoRA（8GB 显存 QLoRA）
+python scripts/export_training_data.py --out data/train
 python scripts/train_lora.py --base models/Qwen2.5-3B-Instruct --data data/train --out data/lora/style
 
-# 7) A/B 评测
-python scripts/eval_ab.py --adapter data/lora/style --judge
+# 7) A/B 评测（生成与盲评分两段跑，避开显存争用）
+python scripts/eval_ab.py --adapter data/lora/style
+python scripts/judge_replies.py
+
+# 8) 带 trace 跑真机（每轮耗时落 data/trace/*.jsonl）
+python -m wagent.main --trace
 ```
 
 ## 目录结构
@@ -112,13 +122,15 @@ src/wagent/
 ├── agent/             # 触发状态机 + 运行时（感知→决策→生成→发送）
 ├── llm/               # 双通道客户端（本地/云端）+ prompt 构建 + 出口清洗
 ├── actuator.py        # 安全执行：dry_run/review/send、拟人打字、前台校验
-├── memory/            # L0-L5：SQLite 存储、分层检索、记忆巩固（事实抽取）
+├── memory/            # L0-L5：SQLite 存储、分层检索、记忆巩固、向量索引(bge-m3)
 ├── importers/         # CSV 导入、滚动 OCR 采史、时间戳解析
 ├── train/             # 训练集构造、合成数据、QLoRA 训练、推理
 ├── eval/              # 规则指标 + LLM 评委 + A/B
+├── observability/     # 轻量 trace（每轮耗时/动作/错误 → JSONL）
 └── main.py            # CLI 主循环
-scripts/               # 现场诊断、训练、评测、数据集导出
-tests/                 # 单测（~190 个，纯逻辑不依赖模型/Windows GUI）
+scripts/               # 现场诊断、采史/巩固/训练/评测/盲评
+docs/                  # RESUME.md（简历&面试材料）、DESIGN_DECISIONS.md（ADR）
+tests/                 # 单测（200+，纯逻辑不依赖模型/Windows GUI）
 ```
 
 ## 质量与指标
@@ -162,7 +174,11 @@ mypy               # 按 Windows 平台类型检查
 ## 路线图
 
 见 [ROADMAP.md](./ROADMAP.md)。已完成：感知层重构、输入框自动定位、安全执行、触发状态机、
-本地/云端双通道、L0-L5 记忆库、离线导入、记忆巩固、训练集管线、LoRA 训练与 A/B 评测框架。
+本地/云端双通道、L0-L5 记忆库、离线导入、记忆巩固、向量检索、训练集管线、LoRA 训练与 A/B 评测、
+trace 可观测。
+
+> 简历/面试材料见 [docs/RESUME.md](./docs/RESUME.md)；关键取舍见
+> [docs/DESIGN_DECISIONS.md](./docs/DESIGN_DECISIONS.md)。
 
 ## License
 

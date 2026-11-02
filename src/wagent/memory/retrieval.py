@@ -21,8 +21,10 @@ import re
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
+from wagent.memory.embeddings import Embedder
 from wagent.memory.store import MemoryStore, parse_ts
 from wagent.memory.types import SELF_PERSON, FactCard
+from wagent.memory.vector import VectorIndex
 
 _TERM_RE = re.compile(r"[\u4e00-\u9fff]+|[A-Za-z0-9]+")
 
@@ -82,10 +84,22 @@ class MemoryContext:
 
 
 class MemoryRetriever:
-    """分层记忆检索器。"""
+    """分层记忆检索器（可选向量召回 + RRF 融合）。"""
 
-    def __init__(self, store: MemoryStore) -> None:
+    def __init__(
+        self,
+        store: MemoryStore,
+        *,
+        vector_index: VectorIndex | None = None,
+        embedder: Embedder | None = None,
+    ) -> None:
         self.store = store
+        self.vector_index = vector_index
+        self.embedder = embedder
+
+    @property
+    def has_vector(self) -> bool:
+        return self.vector_index is not None and self.embedder is not None
 
     # ------------------------------------------------------------ 主入口
 
@@ -111,20 +125,17 @@ class MemoryRetriever:
             "\n".join(f"- {_render_fact(fact)}" for fact in chosen), int(budget * 0.35)
         )
 
-        # 3) 最近 N 天事件
+        # 3) 事件：最近 N 天（recency）与向量召回（semantic）用 RRF 融合
         since = (query.now - timedelta(days=query.recent_days)).isoformat(timespec="seconds")
-        episodes = self.store.recent_episodes(query.person, since=since, limit=query.max_episodes)
+        recent = self.store.recent_episodes(query.person, since=since, limit=query.max_episodes)
+        episodes = self._fuse_episodes(query, recent)
         ctx.episodes_block = _fit(
             "\n".join(f"- {_short_date(ep.ts)} {ep.summary}" for ep in episodes),
             int(budget * 0.2),
         )
 
-        # 4) 风格样本（按最新消息做种子，随场景变化但可复现）
-        samples = self.store.style_samples(SELF_PERSON, limit=50)
-        if samples:
-            rng = random.Random(_seed(query.latest_text))
-            picked = rng.sample(samples, k=min(query.max_style_samples, len(samples)))
-            ctx.style_samples = [f"- {s.text}" for s in picked]
+        # 4) 风格样本：有向量就按语义挑最像场景的，否则按最新消息做种子随机采样
+        ctx.style_samples = self._pick_style_samples(query)
 
         ctx.used_chars = (
             len(ctx.profile_block)
@@ -133,6 +144,81 @@ class MemoryRetriever:
             + sum(len(s) + 1 for s in ctx.style_samples)
         )
         return ctx
+
+    # ------------------------------------------------------------ 向量召回
+
+    def _fuse_episodes(self, query: MemoryQuery, recent: list) -> list:
+        """最近事件 + 语义相关事件融合排序。
+
+        打分：``0.15 * 时间新鲜度 + 0.85 * 余弦相似度``。
+        语义权重更高，因为「问的是工作」时，3 个月前那条工作相关的事件比
+        「昨天聊了猫」更该被想起来；时间新鲜度只做轻微打底，避免完全忽略近况。
+        """
+        if not self.has_vector or not query.latest_text.strip():
+            return recent
+        try:
+            assert self.vector_index is not None and self.embedder is not None
+            hits = self.vector_index.search_by_text(
+                query.person,
+                query.latest_text,
+                self.embedder,
+                kinds=("episode",),
+                top_k=query.max_episodes * 2,
+            )
+        except Exception:
+            return recent
+        if not hits:
+            return recent
+
+        hit_scores = {hit.item_id: hit.score for hit in hits}
+        candidate_ids = list(dict.fromkeys([ep.id for ep in recent] + [h.item_id for h in hits]))
+        fetched = {ep.id: ep for ep in self.store.episodes_by_ids(candidate_ids)}
+        scored: list[tuple[float, object]] = []
+        for item_id in candidate_ids:
+            episode = fetched.get(item_id)
+            if episode is None:
+                continue
+            freshness = self._freshness(episode.ts, query.now)
+            semantic = hit_scores.get(item_id, 0.0)
+            scored.append((0.15 * freshness + 0.85 * semantic, episode))
+        scored.sort(key=lambda pair: pair[0], reverse=True)
+        fused = [episode for _, episode in scored[: query.max_episodes]]
+        return fused or recent
+
+    @staticmethod
+    def _freshness(ts: str, now: datetime) -> float:
+        from math import exp
+
+        happened = parse_ts(ts)
+        if happened is None:
+            return 0.5
+        if happened.tzinfo is None:
+            happened = happened.astimezone()
+        days = max(0.0, (now - happened).total_seconds() / 86400)
+        return exp(-days / 14.0)
+
+    def _pick_style_samples(self, query: MemoryQuery) -> list[str]:
+        """风格 few-shot：向量命中则取最像当前场景的，否则确定性随机采样。"""
+        if self.has_vector and query.latest_text.strip():
+            try:
+                assert self.vector_index is not None and self.embedder is not None
+                hits = self.vector_index.search_by_text(
+                    SELF_PERSON,
+                    query.latest_text,
+                    self.embedder,
+                    kinds=("style",),
+                    top_k=query.max_style_samples,
+                )
+                if hits:
+                    return [f"- {hit.text}" for hit in hits]
+            except Exception:
+                pass
+        samples = self.store.style_samples(SELF_PERSON, limit=50)
+        if not samples:
+            return []
+        rng = random.Random(_seed(query.latest_text))
+        picked = rng.sample(samples, k=min(query.max_style_samples, len(samples)))
+        return [f"- {sample.text}" for sample in picked]
 
     # ------------------------------------------------------------ 打分
 

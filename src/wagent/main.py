@@ -31,7 +31,7 @@ from wagent.im.base import Frame, IMAdapter
 from wagent.im.mock import MockAdapter
 from wagent.llm.client import ChatResult, LLMClient
 from wagent.llm.prompt import load_fewshot, load_profile
-from wagent.memory import MemoryQuery, MemoryRetriever, MemoryStore
+from wagent.memory import MemoryQuery, MemoryRetriever, MemoryStore, VectorIndex
 from wagent.perception.types import Box, Message, Speaker
 
 FAKE_REPLY = "在的 八点老地方见"
@@ -105,7 +105,7 @@ def _seed_demo_memory(store: MemoryStore) -> None:
     store.add_style_samples([StyleSample(text="行吧 先这样"), StyleSample(text="问题不大")])
 
 
-def build_runtime(args: argparse.Namespace, mode: SendMode) -> AgentRuntime:
+def build_runtime(args: argparse.Namespace, mode: SendMode, tracer=None) -> AgentRuntime:
     settings = config_module.get_settings()
 
     adapter: IMAdapter
@@ -118,11 +118,20 @@ def build_runtime(args: argparse.Namespace, mode: SendMode) -> AgentRuntime:
 
     llm: ChatModel = FakeLLM() if args.fake_llm else LLMClient(settings.llm)
 
-    # 层级记忆：从本地 SQLite 检索「画像 + 事实 + 最近事件 + 风格样本」
+    # 层级记忆：SQLite + 向量索引（本地 bge-m3；mock 模式用确定性 HashingEmbedder）
     memory_store = MemoryStore(":memory:") if args.mock else MemoryStore(settings.paths.db_path)
     if args.mock:
         _seed_demo_memory(memory_store)
-    retriever = MemoryRetriever(memory_store)
+    embedder = _build_embedder(mock=args.mock)
+    vector_index = VectorIndex(memory_store)
+    if embedder is not None:
+        try:
+            indexed = vector_index.sync(embedder)
+            if any(indexed.values()):
+                print(f"[memory] 向量索引：{indexed}")
+        except Exception as exc:
+            print(f"[memory] 向量索引失败（退回纯结构化检索）：{exc}")
+    retriever = MemoryRetriever(memory_store, vector_index=vector_index, embedder=embedder)
 
     def memory_for(trigger) -> str:
         query = MemoryQuery(
@@ -152,7 +161,20 @@ def build_runtime(args: argparse.Namespace, mode: SendMode) -> AgentRuntime:
         sender=sender,
         generate=generator,
         mode=mode,
+        tracer=tracer,
     )
+
+
+def _build_embedder(*, mock: bool):
+    """mock 用确定性本地 embedder；真实模式用本地 bge-m3（失败则降级）。"""
+    from wagent.memory.embeddings import HashingEmbedder, OllamaEmbedder
+
+    if mock:
+        return HashingEmbedder(dim=64)
+    try:
+        return OllamaEmbedder()
+    except Exception:
+        return None
 
 
 # ---------------------------------------------------------------- 主循环
@@ -198,6 +220,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--once", action="store_true", help="只跑一轮")
     parser.add_argument("--ticks", type=int, default=0, help="跑固定轮数后退出（0=无限）")
     parser.add_argument("--interval", type=float, default=None, help="轮询间隔（秒）")
+    parser.add_argument("--trace", action="store_true", help="把每轮耗时/动作写入 data/trace/*.jsonl")
     return parser.parse_args(argv)
 
 
@@ -206,8 +229,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     settings = config_module.get_settings()
     mode = SendMode(args.mode) if args.mode is not None else SendMode(settings.agent.mode)
 
+    tracer = None
+    if args.trace:
+        from wagent.observability import Tracer
+
+        trace_path = settings.paths.data_dir / "trace" / f"trace-{time.strftime('%Y%m%d-%H%M%S')}.jsonl"
+        tracer = Tracer(trace_path)
+        print(f"[trace] {trace_path}")
+
     try:
-        runtime = build_runtime(args, mode)
+        runtime = build_runtime(args, mode, tracer=tracer)
     except Exception as exc:
         print(f"[!] 初始化失败: {exc}")
         return 2
@@ -231,6 +262,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         print("[!] 非 dry_run 模式会真的操作键鼠，请确认微信窗口位置正确")
 
     run(runtime, interval_s=interval, max_ticks=max_ticks)
+    if tracer is not None:
+        tracer.close()
+        print(f"[trace] 汇总：{tracer.summary()}")
     return 0
 
 

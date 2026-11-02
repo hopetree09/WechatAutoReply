@@ -20,6 +20,7 @@ data/lora/
 data/train/
 data/train_synth/
 data/train_demo/
+data/trace/
 data/raw/
 models/
 *.gguf

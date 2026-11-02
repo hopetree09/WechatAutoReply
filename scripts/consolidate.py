@@ -38,6 +38,8 @@ def main() -> int:
     parser.add_argument("--model", default="qwen2.5:7b-instruct-q4_K_M")
     parser.add_argument("--provider", default="local", choices=["local", "cloud"])
     parser.add_argument("--no-summary", action="store_true")
+    parser.add_argument("--index", action="store_true", help="巩固后顺便建/更新向量索引")
+    parser.add_argument("--embed-model", default="bge-m3")
     args = parser.parse_args()
 
     settings = get_settings()
@@ -70,6 +72,15 @@ def main() -> int:
             print(f"  [事件] {episode.ts[:10]} {episode.summary}")
 
     print("[db]", store.stats())
+
+    if args.index:
+        from wagent.memory.embeddings import OllamaEmbedder
+        from wagent.memory.vector import VectorIndex
+
+        embedder = OllamaEmbedder(model=args.embed_model)
+        added = VectorIndex(store).sync(embedder)
+        print(f"[index] 新增向量：{added}，累计 {store.count_embeddings()} 条")
+
     store.close()
     return 0
 

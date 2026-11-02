@@ -17,6 +17,7 @@ from wagent.agent.state import ConversationState, Trigger
 from wagent.im.base import IMAdapter
 from wagent.llm.client import ChatModel, ChatResult, LLMError
 from wagent.llm.prompt import build_messages, clean_reply
+from wagent.observability import Tracer
 
 Action = Literal["no_trigger", "preview", "replied", "skipped", "failed"]
 
@@ -109,24 +110,55 @@ class AgentRuntime:
     generate: Generator
     mode: SendMode = SendMode.DRY_RUN
     on_event: Callable[[TickResult], None] | None = field(default=None, repr=False)
+    tracer: Tracer | None = field(default=None, repr=False)
+
+    def _trace(self, kind: str, **data: object) -> None:
+        if self.tracer is not None:
+            self.tracer.event(kind, **data)
+
+    def _span(self, kind: str, started: float, **data: object) -> None:
+        if self.tracer is not None:
+            self.tracer.span(kind, started, **data)
 
     def tick(self) -> TickResult:
         """跑一轮；任何异常都收敛成 ``failed``，不让主循环崩掉。"""
+        import time
+
+        tick_started = time.perf_counter()
         try:
+            capture_started = time.perf_counter()
             frame = self.adapter.capture()
+            self._span(
+                "perceive",
+                capture_started,
+                messages=len(frame.messages),
+                session=frame.session,
+            )
         except Exception as exc:
+            self._trace("error", stage="perceive", error=str(exc))
             return self._emit(TickResult("failed", error=f"感知失败: {exc}"))
 
         trigger = self.state.observe(frame.messages, session=frame.session)
         if trigger is None:
+            self._span("tick", tick_started, action="no_trigger")
             return self._emit(TickResult("no_trigger"))
+        self._trace(
+            "trigger",
+            speaker=trigger.message.speaker.value,
+            text=trigger.message.text[:120],
+            session=trigger.session,
+        )
 
+        generate_started = time.perf_counter()
         try:
             reply = self.generate(trigger)
+            self._span("generate", generate_started, reply=reply[:120])
         except LLMError as exc:
+            self._trace("error", stage="generate", error=str(exc))
             self.state.fail()
             return self._emit(TickResult("failed", trigger=trigger, error=f"生成失败: {exc}"))
         except Exception as exc:
+            self._trace("error", stage="generate", error=str(exc))
             self.state.fail()
             return self._emit(TickResult("failed", trigger=trigger, error=f"生成异常: {exc}"))
 
@@ -136,9 +168,11 @@ class AgentRuntime:
 
         input_box = self.adapter.input_box()
         if input_box is None:
+            self._trace("error", stage="locate_input", error="未定位到输入框")
             self.state.fail()
             return self._emit(TickResult("failed", trigger=trigger, error="未定位到输入框"))
 
+        send_started = time.perf_counter()
         try:
             send_result = self.sender.send(
                 reply,
@@ -146,7 +180,15 @@ class AgentRuntime:
                 click_point=input_box.click_point(),
                 mode=self.mode,
             )
+            self._span(
+                "send",
+                send_started,
+                sent=send_result.sent,
+                reason=send_result.reason,
+                mode=self.mode.value,
+            )
         except Exception as exc:
+            self._trace("error", stage="send", error=str(exc))
             self.state.fail()
             return self._emit(
                 TickResult("failed", trigger=trigger, reply=reply, error=f"发送异常: {exc}")
@@ -154,20 +196,24 @@ class AgentRuntime:
 
         if send_result.sent:
             self.state.mark_sent(reply)
+            self._span("tick", tick_started, action="replied")
             return self._emit(
                 TickResult("replied", trigger=trigger, reply=reply, send=send_result)
             )
         if send_result.reason == "dry_run":
             self.state.skip()
+            self._span("tick", tick_started, action="preview")
             return self._emit(
                 TickResult("preview", trigger=trigger, reply=reply, send=send_result)
             )
         if send_result.reason == "review_rejected":
             self.state.skip()
+            self._span("tick", tick_started, action="skipped")
             return self._emit(
                 TickResult("skipped", trigger=trigger, reply=reply, send=send_result)
             )
         self.state.fail()
+        self._span("tick", tick_started, action="failed")
         return self._emit(
             TickResult(
                 "failed",
