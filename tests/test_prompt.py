@@ -92,6 +92,14 @@ def test_clean_reply_handles_code_fence_and_multiline() -> None:
     assert clean_reply("在的\n另外明天见") == "在的"
 
 
+def test_clean_reply_keeps_wechat_emoji_placeholders() -> None:
+    """回归：清洗不能把「[强]」「[衰]」的方括号啃掉（真机里这很常见）。"""
+    assert clean_reply("[强]") == "[强]"
+    assert clean_reply("[衰]没呢") == "[衰]没呢"
+    assert clean_reply("行吧[失望]") == "行吧[失望]"
+    assert clean_reply("「在的」") == "在的"  # 普通引号仍然清洗
+
+
 def test_clean_reply_empty() -> None:
     assert clean_reply("") == ""
     assert clean_reply("   \n  ") == ""

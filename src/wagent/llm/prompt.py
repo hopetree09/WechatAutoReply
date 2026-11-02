@@ -31,7 +31,7 @@ UNTRUSTED_NOTE = (
 _FENCE_RE = re.compile(r"```[a-zA-Z0-9_-]*\n?(.*?)```", re.DOTALL)
 _PREFIX_RE = re.compile(r"^\s*(?:回复|回答|答|我)[:：]\s*")
 _LIST_PREFIX_RE = re.compile(r"^\s*(?:\d{1,2}[.、)]|[-*•>])\s+")
-_QUOTES = "\"'`“”‘’「」『』【】[]（）()"
+_QUOTES = "\"'`“”‘’「」『』"  # 不含 []【】()：微信表情占位 [强]/[衰] 必须保留
 
 
 def load_profile(path: Path) -> str:
