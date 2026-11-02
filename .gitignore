@@ -11,6 +11,12 @@ data/raw/
 data/fewshot/*.txt
 data/profile.md
 data/memory/
+data/calibration.json
+data/agent.db
+data/agent.db-*
+models/
+*.gguf
+*.safetensors
 
 # ── 运行时产物 ────────────────────────────────────────────
 __pycache__/
