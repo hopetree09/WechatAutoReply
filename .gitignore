@@ -21,6 +21,7 @@ data/train/
 data/train_synth/
 data/train_demo/
 data/train_real/
+data/train_real_matched/
 data/eval/real/
 data/eval/real2/
 data/trace/

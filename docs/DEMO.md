@@ -218,3 +218,40 @@ python scripts/demo_compare.py        # 手写上下文 × 3 组 prompt + MockAd
 > 顺带修了一个真 bug：`clean_reply` 的引号清洗集合里包含了 `[]`，
 > 会把 `[强]` 洗成 `强`、`[衰]没呢` 洗成 `衰]没呢`（实测输出里真的出现了）。
 > 已改为只清洗中英文引号，并加回归测试。
+
+## 8. 3B LoRA 直接吃「画像+记忆」的实测：负结果（重要）
+
+三件套（画像 + 记忆 + LoRA）的设想很自然，但**实测下来 3B LoRA 撑不住**，记录如下。
+
+```powershell
+# ① 原始 adapter（短 prompt 训练）直接喂长 prompt（画像+记忆）
+python scripts/demo_compare.py --provider lora --adapter data/lora/qwen25-3b-real
+
+# ② 按推理 prompt 重做训练集并重训（system 里带画像+记忆）
+python scripts/export_matched_training_data.py --person <联系人> --limit 2000
+python scripts/train_lora.py --data data/train_real_matched --out data/lora/qwen25-3b-real-matched --limit-samples 800
+python scripts/demo_compare.py --provider lora --adapter data/lora/qwen25-3b-real-matched
+
+# ③ 原始 adapter 用回训练时的短 prompt（验证「纯风格引擎」）
+python scripts/demo_compare.py --provider lora --adapter data/lora/qwen25-3b-real --system-mode short --no-runtime
+```
+
+| 配置 | 平均长度 | AI 味 | 现象 |
+|---|---|---|---|
+| 7B + 画像 + 记忆闸门（上一轮） | 13.9 字 | 0.00 | 内容/口吻都还行，能答「5060」「周日下午回来」 |
+| 3B 原始 LoRA + 长 prompt | 4~9 字 | 0.00 | 口头禅复读（「我草」）、玩笑直接复述对方原话、答非所问 |
+| 3B matched LoRA + 长 prompt | 27~42 字 | **0.19~0.43** | 更糟：开始**复读 system 里的记忆/画像**（「导师是武大女篮队员」重复、编导师对话），长回复退化 |
+| 3B 原始 LoRA + 短 prompt | 8.0 字 | 0.00 | 短句口语风格保持，但没有画像/记忆能力，内容常答错（显卡胡编、情绪答非所问） |
+
+原因判断：
+1. **train/inference prompt 分布不一致**：训练时 system 只有一句话，推理时是「画像 + 77 条事实 + few-shot」的长 prompt；
+2. **3B 容量不够**：长 system 里的事实密度太高，模型学会"抄 prompt"而不是"参考 prompt"；
+3. 按推理 prompt 重训（matched，loss 0.32）反而**过拟合到复述 system 内容**——loss 很低不代表回复好，这是个小模型陷阱。
+
+结论与建议（已写进 RESUME 的"局限"）：
+- 3B LoRA 的正确定位是**风格引擎**，不要指望它同时做记忆推理；
+- 三件套的可行组合是**两段式**：7B/云端负责"理解 + 记忆 + 生成内容" → 3B LoRA 负责"改写成我的口吻"；
+- 或上线直接用 7B + 画像 + 记忆闸门（当前已经可用），3B LoRA 留作低成本风格改写器；
+- 想单模型端到端，需要用 7B 在长 prompt 下批量生成数据来蒸馏 3B（工程量大，未做）。
+
+> 这次是**负结果**，但它说明评测体系在起作用：如果没有 `demo_compare` + 规则指标 + 盲评，很容易把"loss 0.32"当成成功。

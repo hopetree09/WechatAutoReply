@@ -16,9 +16,12 @@ from __future__ import annotations
 
 import json
 import time
-from dataclasses import asdict, dataclass
+from collections.abc import Sequence
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
+
+from wagent.llm.client import ChatResult
 
 DEFAULT_TARGET_MODULES = [
     "q_proj",
@@ -255,28 +258,81 @@ def load_for_inference(base_model: str, adapter_dir: str | None = None, *, load_
     return model, tokenizer
 
 
-def generate_reply(model, tokenizer, user_content: str, *, max_new_tokens: int = 48) -> str:
-    """给定 user 内容（含上下文），生成一句回复。"""
+def generate_from_messages(
+    model,
+    tokenizer,
+    messages: Sequence[dict[str, str]],
+    *,
+    max_new_tokens: int = 64,
+    temperature: float = 0.7,
+) -> str:
+    """完整 messages（system+user）→ 生成一句回复（保留调用方构造的画像/记忆 prompt）。"""
     import torch
 
-    messages = [
-        {
-            "role": "system",
-            "content": "你是「我」本人，正在微信聊天，用我平时的口吻简短回复。",
-        },
-        {"role": "user", "content": user_content},
-    ]
     text = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
     inputs = tokenizer(text, return_tensors="pt").to(model.device)
     with torch.no_grad():
         output = model.generate(
             **inputs,
             max_new_tokens=max_new_tokens,
-            do_sample=True,
-            temperature=0.8,
+            do_sample=temperature > 0,
+            temperature=max(temperature, 0.01),
             top_p=0.9,
             repetition_penalty=1.05,
             pad_token_id=tokenizer.pad_token_id,
         )
     new_tokens = output[0][inputs["input_ids"].shape[1] :]
     return tokenizer.decode(new_tokens, skip_special_tokens=True).strip()
+
+
+@dataclass
+class LoraChatModel:
+    """把本地 3B+LoRA 包装成 :class:`ChatModel`，可以直接塞进 LLMGenerator / 评测脚本。"""
+
+    base_model: str
+    adapter_dir: str | None = None
+    max_new_tokens: int = 64
+    temperature: float = 0.7
+    load_in_4bit: bool = True
+    _model: Any = field(default=None, init=False, repr=False)
+    _tokenizer: Any = field(default=None, init=False, repr=False)
+
+    def _ensure(self) -> None:
+        if self._model is None:
+            self._model, self._tokenizer = load_for_inference(
+                self.base_model, self.adapter_dir, load_in_4bit=self.load_in_4bit
+            )
+
+    def chat(
+        self,
+        messages: Sequence[Any],
+        *,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+        **kwargs: Any,
+    ) -> ChatResult:
+        self._ensure()
+        turns = []
+        for message in messages:
+            if hasattr(message, "to_dict"):
+                turns.append(message.to_dict())
+            else:
+                turns.append({"role": message["role"], "content": message["content"]})
+        started = time.time()
+        text = generate_from_messages(
+            self._model,
+            self._tokenizer,
+            turns,
+            max_new_tokens=max_tokens or self.max_new_tokens,
+            temperature=self.temperature if temperature is None else temperature,
+        )
+        model_name = self.adapter_dir or self.base_model
+        return ChatResult(
+            text=text,
+            model=model_name,
+            provider="lora",
+            tokens_in=0,
+            tokens_out=0,
+            latency_s=round(time.time() - started, 3),
+            attempts=1,
+        )

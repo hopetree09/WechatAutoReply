@@ -120,6 +120,23 @@ def generate(llm, case: DemoCase, *, profile: str, fewshot: list[str], memory: s
     return clean_reply(llm.chat(turns).text)
 
 
+def generate_short(llm, case: DemoCase) -> str:
+    """LoRA 训练时的短 system prompt（原 adapter 的训练分布），用于验证「纯风格引擎」。"""
+    from wagent.llm.client import MessageTurn
+    from wagent.train.dataset import DEFAULT_SYSTEM
+
+    history = "\n".join(
+        f"{'我' if speaker == '我' else '对方'}: {text}" for speaker, text in case.context
+    )
+    user = (
+        f"最近聊天记录：\n{history}\n\n"
+        f"对方刚发来：{case.latest}\n\n"
+        "请以我的口吻回复（只输出回复内容）："
+    )
+    turns = [MessageTurn("system", DEFAULT_SYSTEM), MessageTurn("user", user)]
+    return clean_reply(llm.chat(turns).text)
+
+
 class FakeSender(SafeSender):
     """记录发送调用，不碰键鼠。"""
 
@@ -197,13 +214,44 @@ def run_runtime_demo(llm, retriever, profile: str, fewshot: list[str]) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="不碰微信的 prompt / 运行时自测")
-    parser.add_argument("--judge", action="store_true", help="跑 LLM 盲评（A vs C）")
+    parser.add_argument("--judge", action="store_true", help="跑 LLM 盲评（A vs C，用本地 7B）")
+    parser.add_argument(
+        "--provider",
+        choices=("ollama", "lora"),
+        default="ollama",
+        help="生成模型：ollama=本地 7B（默认）；lora=Qwen2.5-3B + 真实数据 adapter",
+    )
+    parser.add_argument(
+        "--base",
+        default=str(ROOT / "models" / "models" / "Qwen--Qwen2.5-3B-Instruct" / "snapshots" / "master"),
+    )
+    parser.add_argument("--adapter", default=str(ROOT / "data" / "lora" / "qwen25-3b-real"))
+    parser.add_argument("--max-new-tokens", type=int, default=64)
+    parser.add_argument(
+        "--system-mode",
+        choices=("full", "short"),
+        default="full",
+        help="full=画像+记忆的长 system prompt；short=LoRA 训练时的短 system prompt",
+    )
+    parser.add_argument("--no-runtime", action="store_true", help="跳过 MockAdapter 运行时演示")
     args = parser.parse_args()
 
     settings = get_settings()
     profile = load_profile(settings.paths.profile_path)
     fewshot = load_fewshot(settings.paths.fewshot_dir)
-    llm = LLMClient(settings.llm)
+    if args.provider == "lora":
+        from wagent.train.lora import LoraChatModel
+
+        llm = LoraChatModel(
+            base_model=args.base,
+            adapter_dir=args.adapter,
+            max_new_tokens=args.max_new_tokens,
+        )
+        print(f"[demo] 模型：Qwen2.5-3B + LoRA adapter={args.adapter}")
+        print("[demo] 首次生成会加载 4bit 模型（约 20s）…")
+    else:
+        llm = LLMClient(settings.llm)
+        print(f"[demo] 模型：Ollama {settings.llm.local_model}")
 
     store = MemoryStore(settings.paths.db_path)
     retriever = MemoryRetriever(store)
@@ -214,6 +262,25 @@ def main() -> int:
         retriever = MemoryRetriever(store, vector_index=vector_index, embedder=embedder)
     except Exception as exc:
         print(f"[demo] 向量检索不可用，退回关键词：{exc}")
+
+    if args.system_mode == "short":
+        print("=" * 72)
+        print("LoRA 短 system prompt（训练分布）：每例只生成一条")
+        print("=" * 72)
+        short_rows = [(case, generate_short(llm, case)) for case in CASES]
+        for case, reply in short_rows:
+            score = score_reply(reply)
+            print(f"\n[{case.topic}] 对方: {case.latest}")
+            print(f"  LoRA: {reply}")
+            print(f"    综合 {score.score:.3f} | AI味 {score.ai_flavor:.3f} | 长度 {len(reply)} 字")
+        scores = [score_reply(reply) for _case, reply in short_rows]
+        print(f"\n[short] 平均综合 {sum(s.score for s in scores) / len(scores):.3f} | "
+              f"AI 味 {sum(s.ai_flavor for s in scores) / len(scores):.3f} | "
+              f"平均长度 {sum(len(r) for _c, r in short_rows) / len(short_rows):.1f} 字")
+        if not args.no_runtime:
+            run_runtime_demo(llm, retriever, profile, fewshot)
+        store.close()
+        return 0
 
     rows = []
     print("=" * 72)
@@ -250,7 +317,8 @@ def main() -> int:
     if args.judge:
         from wagent.eval.ab import LLMJudge
 
-        judge = LLMJudge(llm)
+        # 评委固定用本地 7B（3B 4bit 与 7B 同时驻留容易 OOM）
+        judge = LLMJudge(LLMClient(get_settings().llm))
         wins = {"A 裸模型": 0, "C +画像+记忆": 0, "平": 0}
         for row in rows:
             result = judge.compare(
@@ -263,7 +331,8 @@ def main() -> int:
             wins[winner] += 1
         print(f"[judge] A vs C：{wins}")
 
-    run_runtime_demo(llm, retriever, profile, fewshot)
+    if not args.no_runtime:
+        run_runtime_demo(llm, retriever, profile, fewshot)
     store.close()
     return 0
 
