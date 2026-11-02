@@ -94,22 +94,28 @@ python -m wagent.main            # 截图 → OCR → 触发/意图 → 生成 �
 # 3) 人工确认后发送（意图路由与安全护栏默认开启；--no-intent/--no-guard 可关）
 python -m wagent.main --mode review
 
-# 4) 导入历史聊天（两种来源，任选）
-python -m wagent.import_chat csv   --file chat.csv --person 张三
-python -m wagent.import_chat scroll --person 张三 --max-frames 20
+# 4) 导入历史聊天（三种来源，任选；详见 docs/DATA_EXPORT.md）
+python -m wagent.import_chat inspect --file data/raw/张三.jsonl   # 先探测格式并给出命令
+python -m wagent.import_chat json    --file data/raw/张三.jsonl --person 张三   # Moect JSONL（推荐）
+python -m wagent.import_chat csv     --file data/raw/张三.csv   --person 张三 --me "我的微信昵称"
+python -m wagent.import_chat scroll  --person 张三 --max-frames 20            # 零第三方：滚动 OCR 采史
 
-# 5) 记忆巩固（LLM 抽事实 + 摘要）并建向量索引（本地 bge-m3）
+# 5) 从真实历史自动生成「我的自述画像」→ data/profile.md（运行时 prompt 直接用）
+python scripts/build_profile.py --person 张三
+
+# 6) 记忆巩固（LLM 抽事实 + 摘要）并建向量索引（本地 bge-m3）
 python scripts/consolidate.py --person 张三 --index
 
-# 6) 导出训练集 → 训练 3B LoRA（8GB 显存 QLoRA）
+# 7) 导出训练集 → 训练 3B LoRA（8GB 显存 QLoRA）
 python scripts/export_training_data.py --out data/train
 python scripts/train_lora.py --base models/Qwen2.5-3B-Instruct --data data/train --out data/lora/style
 
-# 7) A/B 评测（生成与盲评分两段跑，避开显存争用）
+# 8) A/B 评测（生成与盲评分两段跑，避开显存争用）+ 记忆召回评测
 python scripts/eval_ab.py --adapter data/lora/style
 python scripts/judge_replies.py
+python scripts/recall_eval.py --person 张三 --limit 30
 
-# 8) 带 trace 跑真机（每轮耗时落 data/trace/*.jsonl）
+# 9) 带 trace 跑真机（每轮耗时落 data/trace/*.jsonl）
 python -m wagent.main --trace
 ```
 
@@ -175,13 +181,13 @@ LoRA : [强]                                                       → 被判胜
 
 | 组 | 综合分 | 风格相似 | AI 味 |
 |---|---|---|---|
-| 无记忆 | 0.529 | 0.058 | 0.00 |
-| 有记忆 | 0.533 | 0.069 | 0.00 |
+| 无记忆 | 0.558 | 0.117 | 0.00 |
+| 有记忆 | **0.588** | **0.176** | 0.00 |
 
-LLM 盲评 5 : 2 : 5（无记忆胜/有记忆胜/平）——规则指标略升、盲评无显著差异。
-**诚实结论：在「短句闲聊」场景，记忆注入的收益不明显；它的价值主要在"记得住事实/约定"，
-需要用回忆类问题单独评测**（后续工作）。合成数据上的首轮消融为 0.587→0.625（5:3:4），
-同样不能夸大。完整记录见 [docs/DEMO.md](./docs/DEMO.md)。
+LLM 盲评 2 : 4 : 6（无记忆胜/有记忆胜/平）——修复 **`__self__` 事实不参与检索**的 bug 后，
+风格相似 0.117→0.176、有记忆胜率 **0.667**（修复前只有 0.286，说明"记忆没用"的结论一部分是 bug 造成的）。
+诚实结论：短句闲聊里记忆整体收益仍有限（平局多），但不再为负；它真正的价值是"记得住事实/约定"，
+已用召回评测单独验证（下）。合成数据首轮消融为 0.587→0.625（5:3:4）。完整记录见 [docs/DEMO.md](./docs/DEMO.md)。
 
 **记忆召回评测**（28 条真实事实卡 → 生成回忆式问题 → 走完整检索链，不需要生成模型）：
 

@@ -152,13 +152,14 @@ python scripts/ablation.py --limit 12
 
 ```
 [ablation] 真实记忆库：data\agent.db，person=<联系人>，风格样本=212
-[ablation] 无记忆：{'n': 12, 'score': 0.529, 'style': 0.058, 'ai_flavor': 0.0, 'length': 1.0}
-[ablation] 有记忆：{'n': 12, 'score': 0.533, 'style': 0.069, 'ai_flavor': 0.0, 'length': 0.993}
-[ablation] 盲评：无记忆 5 / 有记忆 2 / 平 5
+[ablation] 无记忆：{'n': 12, 'score': 0.558, 'style': 0.117, 'ai_flavor': 0.0, 'length': 1.0}
+[ablation] 有记忆：{'n': 12, 'score': 0.588, 'style': 0.176, 'ai_flavor': 0.0, 'length': 1.0}
+[ablation] 盲评：无记忆 2 / 有记忆 4 / 平 6（有记忆胜率 0.667）
 ```
 
-结论：**短句闲聊场景里记忆注入收益不明显**；记忆真正的价值在「回忆事实/约定」，
-应该用回忆类问题单独评测（已列入后续工作）。
+结论：修复 `__self__` 事实检索 bug 后，记忆组从"负收益"变成"小幅正收益"（盲评 0.286 → 0.667），
+但短句闲聊里平局仍多。记忆真正的价值在「回忆事实/约定」，已由 `scripts/recall_eval.py` 单独验证：
+**recall@1 0.61→0.96、recall@3 0.64→1.00、MRR 0.62→0.98**。
 
 ## 6. 复现清单
 

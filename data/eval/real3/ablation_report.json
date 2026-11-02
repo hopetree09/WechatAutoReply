@@ -1,0 +1,145 @@
+{
+  "n": 12,
+  "model": "qwen2.5:7b-instruct-q4_K_M",
+  "memory_hit_rate": 1.0,
+  "base_metrics": {
+    "n": 12,
+    "score": 0.558,
+    "style": 0.117,
+    "ai_flavor": 0.0,
+    "length": 1.0
+  },
+  "memory_metrics": {
+    "n": 12,
+    "score": 0.588,
+    "style": 0.176,
+    "ai_flavor": 0.0,
+    "length": 1.0
+  },
+  "base_wins": 2,
+  "memory_wins": 4,
+  "ties": 6,
+  "memory_win_rate": 0.667,
+  "details": [
+    {
+      "latest": "加油",
+      "base": {
+        "reply": "好嘞～[得意"
+      },
+      "memory": {
+        "reply": "回来了～"
+      },
+      "winner": "B"
+    },
+    {
+      "latest": "都怪你",
+      "base": {
+        "reply": "那我知道了～[得意"
+      },
+      "memory": {
+        "reply": "炸炸炸，你自己不是也说了都怪你[衰"
+      },
+      "winner": "B"
+    },
+    {
+      "latest": "怎么跟那晃来晃去吵死了",
+      "base": {
+        "reply": "晕]室友又夜猫子了～[睡"
+      },
+      "memory": {
+        "reply": "可能是他们玩得太嗨了[衰"
+      },
+      "winner": "B"
+    },
+    {
+      "latest": "饭也不吃了",
+      "base": {
+        "reply": "那我知道了[失望]你玩吧～"
+      },
+      "memory": {
+        "reply": "那就凑合着吃点吧～"
+      },
+      "winner": "tie"
+    },
+    {
+      "latest": "阿根廷球都不好传",
+      "base": {
+        "reply": "那我知道了[得意"
+      },
+      "memory": {
+        "reply": "那我知道了～[得意"
+      },
+      "winner": "tie"
+    },
+    {
+      "latest": "其他不用多说",
+      "base": {
+        "reply": "涉及到嫂子的事情，以后都会小心的，你放心吧～"
+      },
+      "memory": {
+        "reply": "知道了～一会儿说"
+      },
+      "winner": "B"
+    },
+    {
+      "latest": "你几把chipchip弱成啥了",
+      "base": {
+        "reply": "那我知道了～[失望"
+      },
+      "memory": {
+        "reply": "那我知道了～你玩吧[失望"
+      },
+      "winner": "tie"
+    },
+    {
+      "latest": "贵死了",
+      "base": {
+        "reply": "你修平板啊，多少钱？[好奇"
+      },
+      "memory": {
+        "reply": "涨价了～"
+      },
+      "winner": "tie"
+    },
+    {
+      "latest": "哦哦",
+      "base": {
+        "reply": "对对对[强"
+      },
+      "memory": {
+        "reply": "嗯嗯～"
+      },
+      "winner": "A"
+    },
+    {
+      "latest": "想开桂的心情达到了顶峰",
+      "base": {
+        "reply": "想开桂心情炸炸炸～"
+      },
+      "memory": {
+        "reply": "想开桂心情好耶～[得意"
+      },
+      "winner": "A"
+    },
+    {
+      "latest": "你是个调",
+      "base": {
+        "reply": "你玩吧[得意"
+      },
+      "memory": {
+        "reply": "你玩吧[得意"
+      },
+      "winner": "tie"
+    },
+    {
+      "latest": "嗷",
+      "base": {
+        "reply": "你玩吧[得意"
+      },
+      "memory": {
+        "reply": "那你知道啥时候出成绩不[失望"
+      },
+      "winner": "tie"
+    }
+  ]
+}
