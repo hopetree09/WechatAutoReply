@@ -5,9 +5,9 @@
 - ``--live``：直接截取当前微信窗口的最后一条对方消息，作为"刚发来"的消息做预览（不发送）。
 
 用法：
-    python scripts/reply_compare.py --person 吴浩毅 --cases 5
+    python scripts/reply_compare.py --person 张伟 --cases 5
     python scripts/reply_compare.py --live
-    python scripts/reply_compare.py --person 吴浩毅 --cases 5 --judge
+    python scripts/reply_compare.py --person 张伟 --cases 5 --judge
 """
 
 from __future__ import annotations
@@ -125,7 +125,7 @@ def run_case(llm, case: Case, *, profile: str, fewshot: list[str], memory: str) 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="三组 prompt 的回复效果对比")
-    parser.add_argument("--person", default="吴浩毅")
+    parser.add_argument("--person", default="张伟")
     parser.add_argument("--db", default=str(ROOT / "data" / "agent.db"))
     parser.add_argument("--cases", type=int, default=5)
     parser.add_argument("--seed", type=int, default=42)

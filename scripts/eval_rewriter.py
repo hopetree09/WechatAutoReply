@@ -47,7 +47,7 @@ def fidelity(text: str, draft: str) -> float:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="rewriter held-out 评测")
-    parser.add_argument("--person", default="吴浩毅")
+    parser.add_argument("--person", default="张伟")
     parser.add_argument("--db", default=str(ROOT / "data" / "agent.db"))
     parser.add_argument(
         "--base",

@@ -6,7 +6,7 @@
 3. 写成 Markdown 文件（`load_profile` 直接读取）；LLM 失败时退回规则版画像。
 
 用法：
-    python scripts/build_profile.py --db data/agent.db --person 吴浩毅 --out data/profile.md
+    python scripts/build_profile.py --db data/agent.db --person 张伟 --out data/profile.md
 """
 
 from __future__ import annotations

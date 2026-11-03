@@ -8,7 +8,7 @@
 这比「盲评回复像不像」更能体现层级记忆本身的价值。
 
 用法：
-    python scripts/recall_eval.py --db data/agent.db --person 吴浩毅 --limit 30
+    python scripts/recall_eval.py --db data/agent.db --person 张伟 --limit 30
 """
 
 from __future__ import annotations

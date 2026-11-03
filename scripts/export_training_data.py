@@ -1,7 +1,7 @@
 """从本地记忆库导出 LoRA 训练集（ChatML JSONL）。
 
 用法：
-    D:\\conda\\envs\\wagent\\python.exe scripts\\export_training_data.py --out data/train
+    python scripts\\export_training_data.py --out data/train
     ... --person 张三 --window 6 --val-ratio 0.1
 """
 

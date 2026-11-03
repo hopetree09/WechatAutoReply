@@ -39,7 +39,7 @@ from wagent.memory import MemoryQuery, MemoryRetriever, MemoryStore, VectorIndex
 from wagent.memory.embeddings import OllamaEmbedder  # noqa: E402
 from wagent.perception.types import Box, Message, Speaker  # noqa: E402
 
-SESSION = "吴浩毅"  # 记忆库里的 person key；上下文是脚本手写的，不含真实聊天内容
+SESSION = "张伟"  # 记忆库里的 person key；上下文是脚本手写的，不含真实聊天内容
 
 
 @dataclass(frozen=True)

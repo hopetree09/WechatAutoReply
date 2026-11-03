@@ -157,7 +157,7 @@ def test_generator_skips_memory_for_chitchat() -> None:
 
     def trigger(text: str) -> Trigger:
         latest = Message(speaker=Speaker.OTHER, text=text, box=Box(0, 0, 1, 1))
-        return Trigger(message=latest, context=[], session="吴浩毅")
+        return Trigger(message=latest, context=[], session="张伟")
 
     generator = LLMGenerator(
         Capture(),

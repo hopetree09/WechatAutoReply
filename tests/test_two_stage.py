@@ -22,7 +22,7 @@ def trigger(text: str, context: list[Message] | None = None) -> Trigger:
     return Trigger(
         message=message("other", text),
         context=context or [message("me", "在吗"), message("other", "嗯")],
-        session="吴浩毅",
+        session="张伟",
     )
 
 
@@ -54,7 +54,7 @@ def test_two_stage_uses_second_llm_output() -> None:
 
 
 def test_two_stage_falls_back_when_rewrite_loses_content() -> None:
-    draft_text = "行 周日下午我回来了 周边有啥好吃的推荐不"
+    draft_text = "行 周末下午我回来了 周边有啥好吃的推荐不"
     generator = TwoStageGenerator(
         draft_llm=SimpleNamespace(chat=lambda _m: SimpleNamespace(text=draft_text)),
         rewrite_llm=FakeLLM(["有的"]),
@@ -63,12 +63,12 @@ def test_two_stage_falls_back_when_rewrite_loses_content() -> None:
 
 
 def test_two_stage_accepts_rewrite_when_content_preserved() -> None:
-    draft_text = "行 周日下午我回来了 周边有啥好吃的推荐不"
+    draft_text = "行 周末下午我回来了 周边有啥好吃的推荐不"
     generator = TwoStageGenerator(
         draft_llm=SimpleNamespace(chat=lambda _m: SimpleNamespace(text=draft_text)),
-        rewrite_llm=FakeLLM(["行 周日下午回来 有啥好吃的推荐"]),
+        rewrite_llm=FakeLLM(["行 周末下午回来 有啥好吃的推荐"]),
     )
-    assert generator(trigger("周末吃火锅不")) == "行 周日下午回来 有啥好吃的推荐"
+    assert generator(trigger("周末吃火锅不")) == "行 周末下午回来 有啥好吃的推荐"
 
 
 def test_two_stage_memory_policy() -> None:

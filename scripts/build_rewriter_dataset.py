@@ -8,7 +8,7 @@
 同时导出一份 held-out 评测集（draft + 真实回复），用于训完后对比「草稿 vs rewriter」。
 
 用法：
-    python scripts/build_rewriter_dataset.py --person 吴浩毅 --limit 500 --eval-cases 30
+    python scripts/build_rewriter_dataset.py --person 张伟 --limit 500 --eval-cases 30
 """
 
 from __future__ import annotations

@@ -1,7 +1,7 @@
 """现场诊断脚本：打印微信窗口信息、截图、输入框定位、OCR、气泡配色学习、消息解析。
 
 用法（必须用 wagent 环境的 python）：
-    D:\\conda\\envs\\wagent\\python.exe scripts\\probe_window.py
+    python scripts\\probe_window.py
     ... --dump-lines      # 逐行打印 OCR + 分类明细
     ... --save-debug      # 保存标注截图与 OCR JSON 到 screenshots/
 

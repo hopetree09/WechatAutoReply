@@ -29,7 +29,7 @@ from wagent.memory import MemoryRetriever, MemoryStore, VectorIndex  # noqa: E40
 from wagent.memory.embeddings import OllamaEmbedder  # noqa: E402
 from wagent.perception.types import Box, Message, Speaker  # noqa: E402
 
-SESSION = "吴浩毅"
+SESSION = "张伟"
 RESULTS = ROOT / "data" / "eval" / "two_stage" / "results.json"
 
 

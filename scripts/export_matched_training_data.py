@@ -7,7 +7,7 @@
 训练出来的 adapter 才适配「三件套」。
 
 用法：
-    python scripts/export_matched_training_data.py --person 吴浩毅 --limit 2000
+    python scripts/export_matched_training_data.py --person 张伟 --limit 2000
     python scripts/train_lora.py --data data/train_real_matched --out data/lora/qwen25-3b-real-matched --limit-samples 800
 """
 
