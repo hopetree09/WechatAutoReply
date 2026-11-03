@@ -290,3 +290,6 @@ python scripts/demo_two_stage.py --stage judge    # 3B 进程退出后，7B 盲�
 
 > 注意：规则分又一次误导——改写组 0.559 > 草稿 0.536，但盲评 6:1 草稿胜。
 > 短回复在风格/长度指标上天然占便宜，**别用单一规则分做上线决策**。
+
+> 最终决策：**在线用 7B + 画像 + 记忆闸门**；3B LoRA 只做离线风格改写（输出过 7B 质检）。
+> 两段式代码保留在 src/wagent/agent/two_stage.py，作为后续 rewriter 训练的起点。

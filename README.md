@@ -24,7 +24,8 @@ flowchart LR
         C --> L[输入框自动定位<br/>分隔线视觉法]
     end
     subgraph 决策层
-        ST[触发状态机<br/>基线/去重/冷却] --> G[回复生成]
+        ST[触发状态机<br/>基线/去重/冷却] --> IR[意图路由<br/>该不该回]
+        IR --> MG[记忆闸门<br/>提问/约时间/回忆才注入]
     end
     subgraph 记忆层 L0-L5
         M1[L0 工作记忆·最近N轮]
@@ -35,25 +36,35 @@ flowchart LR
         M6[向量索引 bge-m3<br/>语义召回 + 时效融合]
     end
     subgraph 模型层
-        LLM1[(本地 Qwen2.5-7B<br/>Ollama)]
-        LLM2[(云端 DeepSeek<br/>可选)]
-        LORA[LoRA 风格 adapter<br/>Qwen2.5-3B]
+        LLM1[(在线：本地 Qwen2.5-7B<br/>Ollama，默认)]
+        LLM2[(在线：云端 DeepSeek<br/>可选)]
+        LORA[离线：3B LoRA 风格改写<br/>可选，输出需 7B 质检]
     end
     subgraph 执行层
+        G[安全护栏<br/>金钱/PII/复述/注入]
         A[SafeSender<br/>dry_run/review/send]
         FG[前台校验·剪贴板保护·拟人打字]
     end
-    EV[评测层<br/>规则指标 + LLM 评委 + A/B]
+    EV[评测层<br/>规则指标 + LLM 评委 + A/B + 召回]
     TR[trace<br/>每轮耗时/动作/错误]
     S --> ST
-    ST --> G
-    M1 & M2 & M3 & M4 & M5 & M6 --> G
-    G --> LLM1 & LLM2 & LORA
+    MG --> G
+    M1 & M2 & M3 & M4 & M5 & M6 --> MG
+    G --> LLM1 & LLM2
+    LLM1 -.离线批量.-> LORA
     G --> A --> FG
     G --> EV
     ST --> TR
     G --> TR
 ```
+
+**最终交付形态（结论）**：
+
+- **在线**用 **7B（或云端）+ 自动画像 + 记忆闸门**：长 prompt 里 7B 能"用"画像/记忆，实测能答出「5060 显卡」「周日下午回来」；
+- **3B LoRA 定位为离线「风格改写/降本」工具**，不参与在线主链路——实测把它塞进「画像+记忆」长 prompt 会复读/退化，
+  两段式（7B 草稿 → 3B 改写）也会丢内容（见 [docs/DEMO.md](./docs/DEMO.md) 第 8、9 节）；
+- 这条"负结果"链本身是简历素材：**明确知道每个模型的边界，并用评测数字支撑决策**。
+
 
 ## 关键工程点（也是面试能讲的部分）
 
@@ -107,6 +118,7 @@ python scripts/build_profile.py --person 张三
 python scripts/consolidate.py --person 张三 --index
 
 # 7) 导出训练集 → 训练 3B LoRA（8GB 显存 QLoRA）
+#    注：3B LoRA 建议只做离线风格改写/降本（输出过 7B 质检）；在线主链路用 7B + 画像 + 记忆闸门
 python scripts/export_training_data.py --out data/train
 python scripts/train_lora.py --base models/Qwen2.5-3B-Instruct --data data/train --out data/lora/style
 
@@ -127,18 +139,18 @@ src/wagent/
 ├── winapi.py          # DPI 感知、点击/滚动/剪贴板、前台窗口
 ├── perception/        # 感知层：窗口/截图/OCR/解析/说话人/区域/输入框/自动标定/帧缓存
 ├── im/                # IM 适配层：WeChatAdapter（真实窗口）+ MockAdapter（离线/CI）
-├── agent/             # 触发状态机 + 意图路由 + 运行时（感知→决策→生成→护栏→发送）
+├── agent/             # 触发状态机 + 意图路由 + 记忆闸门 + 两段式（离线实验）+ 运行时
 ├── llm/               # 双通道客户端（本地/云端）+ prompt 构建 + 出口清洗
 ├── guard/             # 输出护栏：金钱/隐私拦截、PII 脱敏、注入检测
 ├── actuator.py        # 安全执行：dry_run/review/send、拟人打字、前台校验
 ├── memory/            # L0-L5：SQLite 存储、分层检索、记忆巩固、向量索引(bge-m3)
 ├── importers/         # CSV/JSON(L) 导入、导出格式探测、滚动 OCR 采史、时间戳解析
-├── train/             # 训练集构造、合成数据、QLoRA 训练、推理
-├── eval/              # 规则指标 + LLM 评委 + A/B
+├── train/             # 训练集构造、合成数据、QLoRA 训练、推理（LoraChatModel）
+├── eval/              # 规则指标 + LLM 评委 + A/B + 记忆消融 + 召回评测
 ├── observability/     # 轻量 trace（每轮耗时/动作/错误 → JSONL）
 └── main.py            # CLI 主循环
-scripts/               # 现场诊断、采史/巩固/训练/评测/盲评
-docs/                  # RESUME.md（简历&面试材料）、DESIGN_DECISIONS.md（ADR）
+scripts/               # 现场诊断、采史/巩固/画像/训练/评测/盲评/召回/三组对比/两段式
+docs/                  # RESUME.md（简历&面试材料）、DESIGN_DECISIONS.md（ADR）、DEMO.md
 tests/                 # 单测（200+，纯逻辑不依赖模型/Windows GUI）
 ```
 
@@ -207,6 +219,7 @@ LLM 盲评 2 : 4 : 6（无记忆胜/有记忆胜/平）——修复 **`__self__`
 | 说话人判别 | 自动标定 + 加权投票，无法判定返回 UNKNOWN（不触发） |
 | 记忆事实 | 每条带证据消息 id 与原文，可溯源；同 key 冲突自动 supersede |
 | 语义召回 | 本地 bge-m3 + 时间新鲜度融合，旧事件也能被正确想起 |
+| 模型组合 | 在线 7B + 画像 + 记忆闸门；3B LoRA 仅离线改写（两轮实验否定在线方案，见 ADR-10） |
 | 记忆注入策略 | 只在提问/约时间/回顾类消息注入，闲聊不塞记忆（避免答非所问） |
 | 画像口头禅 | 生成时标注「偶尔使用」，system prompt 约束不要每句都带 |
 | 执行安全 | dry_run 不碰键鼠；发送前校验前台窗口；剪贴板保存恢复 |
