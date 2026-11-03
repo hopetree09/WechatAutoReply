@@ -76,6 +76,7 @@ class TwoStageGenerator:
     limit: int = 12
     memory_provider: Callable[[Trigger], str] | None = None
     memory_policy: Callable[[str], bool] | None = None
+    min_fidelity: float = 0.15  # 改写结果与草稿的 2-gram 重叠低于此值 → 判为丢内容，退回草稿
     on_draft: Callable[[str], None] | None = field(default=None, repr=False)
 
     def _memory_block(self, trigger: Trigger) -> str:
@@ -111,4 +112,31 @@ class TwoStageGenerator:
             )
         except Exception:
             return draft
-        return rewritten or draft
+        if not rewritten:
+            return draft
+        # 防「风格洗白」：改写可以短，但不能把草稿的关键信息洗没
+        if self.min_fidelity > 0 and len(draft) >= 6:
+            from wagent.eval.metrics import jaccard
+
+            if jaccard(rewritten, draft, n=2) < self.min_fidelity:
+                return draft
+        return rewritten
+
+REWRITE_SIMPLE_SYSTEM = (
+    """你是微信回复改写器。把我的「草稿」改写成我平时发微信的口吻：
+极短、口语、几乎不用标点。必须保留草稿里的关键信息（时间/数字/结论/态度），
+不要添加新事实，不要解释。只输出一句话。"""
+)
+
+
+def build_rewrite_simple(latest: str, draft: str) -> list:
+    """极简改写 prompt：草稿紧贴指令，不放长上下文，降低 3B 的注意力负担。"""
+    from wagent.llm.client import MessageTurn
+
+    user = (
+        "对方刚发来：" + latest + "\n"
+        "我的草稿：" + draft + "\n"
+        "我的口吻示例：行 你定 / 问题不大 / 好的 / 我看看\n"
+        "改写："
+    )
+    return [MessageTurn("system", REWRITE_SIMPLE_SYSTEM), MessageTurn("user", user)]

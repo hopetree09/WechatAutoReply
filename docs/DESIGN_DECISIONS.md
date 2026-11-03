@@ -76,4 +76,7 @@ eeds_memory() 只在提问/约时间/回忆词注入）；
 - 两段式实现保留在 gent/two_stage.py，作为负结果与后续 rewriter 训练的起点。
 
 **代价**：在线成本更高（7B 慢于 3B）；换来内容正确性与可解释性。
-**后续**：若要 3B 上线，用 7B 批量生成草稿来专门训练 rewriter（草稿+上下文→我的回复），而不是 prompt 硬凑。
+**后续（已试）**：用 7B 批量生成 500 条草稿训练 rewriter，实测两版都以失败告终：
+v1 loss 1.16、v2（极简 prompt/2 epochs）loss 0.86，held-out 保真度仍 ≈0，只有短句风格被学会；
+盲评甚至偏好 rewriter（46.7% 胜），说明**风格评委发现不了内容丢失**。已在 TwoStageGenerator
+加 fidelity 兜底（2-gram 重叠 <0.15 退回草稿），避免风格洗白。

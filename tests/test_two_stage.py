@@ -48,9 +48,27 @@ def test_build_rewrite_messages_contains_draft_and_latest() -> None:
 def test_two_stage_uses_second_llm_output() -> None:
     draft = FakeLLM(["7B 草稿：可以的，你定地方吧"])
     rewrite = FakeLLM(["行 你定"])
-    generator = TwoStageGenerator(draft_llm=draft, rewrite_llm=rewrite)
+    generator = TwoStageGenerator(draft_llm=draft, rewrite_llm=rewrite, min_fidelity=0.0)
     assert generator(trigger("周末吃火锅不")) == "行 你定"
     assert "7B 草稿" in rewrite.prompts[0]
+
+
+def test_two_stage_falls_back_when_rewrite_loses_content() -> None:
+    draft_text = "行 周日下午我回来了 周边有啥好吃的推荐不"
+    generator = TwoStageGenerator(
+        draft_llm=SimpleNamespace(chat=lambda _m: SimpleNamespace(text=draft_text)),
+        rewrite_llm=FakeLLM(["有的"]),
+    )
+    assert generator(trigger("周末吃火锅不")) == draft_text
+
+
+def test_two_stage_accepts_rewrite_when_content_preserved() -> None:
+    draft_text = "行 周日下午我回来了 周边有啥好吃的推荐不"
+    generator = TwoStageGenerator(
+        draft_llm=SimpleNamespace(chat=lambda _m: SimpleNamespace(text=draft_text)),
+        rewrite_llm=FakeLLM(["行 周日下午回来 有啥好吃的推荐"]),
+    )
+    assert generator(trigger("周末吃火锅不")) == "行 周日下午回来 有啥好吃的推荐"
 
 
 def test_two_stage_memory_policy() -> None:
@@ -62,7 +80,7 @@ def test_two_stage_memory_policy() -> None:
 
     memory = "【我记得的事】\n- 我的显卡是 5060"
     generator = TwoStageGenerator(
-        draft_llm=SimpleNamespace(chat=draft),  # type: ignore[arg-type]
+        draft_llm=SimpleNamespace(chat=draft),
         rewrite_llm=FakeLLM(["好"]),
         memory_provider=lambda _t: memory,
         memory_policy=needs_memory,
@@ -79,7 +97,7 @@ def test_two_stage_falls_back_to_draft_when_rewrite_fails() -> None:
             raise RuntimeError("3B 挂了")
 
     generator = TwoStageGenerator(
-        draft_llm=SimpleNamespace(chat=lambda _m: SimpleNamespace(text="7B 草稿")),  # type: ignore[arg-type]
+        draft_llm=SimpleNamespace(chat=lambda _m: SimpleNamespace(text="7B 草稿")),
         rewrite_llm=Broken(),
     )
     assert generator(trigger("在吗")) == "7B 草稿"
@@ -87,7 +105,7 @@ def test_two_stage_falls_back_to_draft_when_rewrite_fails() -> None:
 
 def test_two_stage_empty_draft_returns_empty() -> None:
     generator = TwoStageGenerator(
-        draft_llm=SimpleNamespace(chat=lambda _m: SimpleNamespace(text="")),  # type: ignore[arg-type]
+        draft_llm=SimpleNamespace(chat=lambda _m: SimpleNamespace(text="")),
         rewrite_llm=FakeLLM(["不会被用到"]),
     )
     assert generator(trigger("在吗")) == ""
