@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "wagent"
 version = "0.1.0"
-description = "桌面微信 GUI Agent：屏幕感知 + 层级记忆 + 拟人化回复"
+description = "微信自动回复 Agent：屏幕感知 + 层级记忆 + 意图路由 + 安全执行"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
