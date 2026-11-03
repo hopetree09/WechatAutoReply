@@ -1,5 +1,7 @@
 # wagent · 桌面微信 GUI Agent（带层级记忆）
 
+![ci](https://github.com/hopetree09/WechatAutoReply/actions/workflows/ci.yml/badge.svg)
+
 > **不 hook、不注入、不解密、不碰微信进程内存**：用「截屏 + OCR」感知屏幕，用「键鼠模拟」回复，
 > 用本地大模型 + 分层记忆让回复「记得住事、像本人」。
 
