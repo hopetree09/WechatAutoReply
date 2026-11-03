@@ -7,7 +7,10 @@
 from __future__ import annotations
 
 import re
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+
+# 微信屏幕时间戳是中国时间；固定 +08:00 避免本机时区影响结果
+CN_TZ = timezone(timedelta(hours=8))
 
 _WEEKDAYS = {"一": 0, "二": 1, "三": 2, "四": 3, "五": 4, "六": 5, "日": 6, "天": 6}
 
@@ -30,6 +33,7 @@ def _at(base: datetime, hour: int, minute: int) -> datetime:
 
 def resolve_ts_text(text: str, now: datetime) -> str | None:
     """把屏幕时间戳解析成 ISO 字符串；无法识别返回 ``None``。"""
+    now = now.replace(tzinfo=CN_TZ) if now.tzinfo is None else now.astimezone(CN_TZ)
     raw = (text or "").strip().replace(" ", "")
     if not raw:
         return None
@@ -60,7 +64,7 @@ def resolve_ts_text(text: str, now: datetime) -> str | None:
                 year, month, day_num = int(groups[0]), int(groups[1]), int(groups[2])
                 hour = int(groups[3]) if groups[3] else 0
                 minute = int(groups[4]) if groups[4] else 0
-                return datetime(year, month, day_num, hour, minute).astimezone().isoformat(
+                return datetime(year, month, day_num, hour, minute, tzinfo=CN_TZ).isoformat(
                     timespec="seconds"
                 )
             if kind == "md":
@@ -68,7 +72,7 @@ def resolve_ts_text(text: str, now: datetime) -> str | None:
                 hour = int(groups[2]) if groups[2] else 0
                 minute = int(groups[3]) if groups[3] else 0
                 # 聊天记录里的日期永远是过去：算出来比 now 晚就归到去年
-                candidate = datetime(now.year, month, day_num, hour, minute).astimezone()
+                candidate = datetime(now.year, month, day_num, hour, minute, tzinfo=CN_TZ)
                 if candidate > now:
                     candidate = candidate.replace(year=now.year - 1)
                 return candidate.isoformat(timespec="seconds")

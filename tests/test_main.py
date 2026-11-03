@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import sys
+
+import pytest
+
 from wagent.main import main
 
 
@@ -27,6 +31,7 @@ def test_mock_demo_with_no_intent(capsys) -> None:
     assert "跳过" not in out
 
 
+@pytest.mark.skipif(sys.platform != "win32", reason="依赖 Windows 键鼠后端与前台校验")
 def test_mock_demo_send_mode_blocked_by_foreground_guard(capsys) -> None:
     """mock 场景里 hwnd=1，真实前台窗口不可能是它 → 发送必须被前台校验拦下。"""
     code = main(["--mock", "--fake-llm", "--mode", "send", "--interval", "0"])
